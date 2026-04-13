@@ -121,7 +121,6 @@ PROTEÇÕES DE QUALIDADE:
 
 CASOS DE ENTRADA IMPERFEITA:
 - Para trechos incompletos ou frases soltas, preserve a coerência local.
-- Traduza da melhor forma possível mantendo a naturalidade e evitando alucinações.
 
 TEXTO PARA TRADUÇÃO:
 """
@@ -138,43 +137,62 @@ Retorne estritamente um objeto JSON com a seguinte estrutura:
 
 REGRAS DE SAÍDA:
 - detected_source_language = idioma detectado ou idioma informado.
-- translation = texto traduzido completo.
+- translation = texto traduzido completo. NÃO retorne uma string vazia para a tradução.
 - translator_notes = array vazio se notas estiverem desativadas ou se não houver observações relevantes.
 - Não repita o texto original.
 - Não faça introduções ou comentários fora do JSON.
+- Certifique-se de que o JSON seja válido e bem formado.
 `.trim();
 }
 
 /**
  * 3. callTranslationModel(prompt)
- * Envia o prompt para o modelo configurado no Google AI Studio.
+ * Envia o prompt para o modelo configurado no Google AI Studio com lógica de re-tentativa.
  */
-export async function callTranslationModel(prompt: string): Promise<string> {
+export async function callTranslationModel(prompt: string, retries: number = 2): Promise<string> {
   if (!API_KEY) {
     throw new Error("Configuração da API Gemini não encontrada.");
   }
 
   const ai = new GoogleGenAI({ apiKey: API_KEY });
-  
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        systemInstruction: "Você é um tradutor literário de elite. Responda sempre em JSON conforme solicitado.",
-        responseMimeType: "application/json",
-      },
-    });
+  let lastError: any = null;
 
-    if (!response.text) {
-      throw new Error("A tradução não retornou conteúdo válido.");
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          systemInstruction: "Você é um tradutor literário de elite. Responda sempre em JSON conforme solicitado. Se o texto for complexo, mantenha a integridade literária.",
+          responseMimeType: "application/json",
+        },
+      });
+
+      if (!response.text) {
+        // Se não houver texto, pode ser um problema de segurança ou limite
+        console.warn(`Tentativa ${i + 1}: Resposta vazia do modelo.`);
+        continue;
+      }
+
+      return response.text;
+    } catch (error: any) {
+      lastError = error;
+      console.error(`Erro na tentativa ${i + 1} de chamada ao modelo:`, error);
+      
+      // Se for um erro de quota ou sobrecarga, espera um pouco antes de tentar novamente
+      if (error.message?.includes("429") || error.message?.includes("503")) {
+        await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+      } else if (i < retries) {
+        await new Promise(r => setTimeout(r, 500));
+      }
     }
-
-    return response.text;
-  } catch (error) {
-    console.error("Erro na chamada ao modelo:", error);
-    throw new Error("Não foi possível concluir a tradução agora. Tente novamente.");
   }
+
+  if (lastError?.message?.includes("safety")) {
+    throw new Error("O conteúdo foi bloqueado pelos filtros de segurança do modelo.");
+  }
+
+  throw new Error("A tradução não retornou conteúdo válido após várias tentativas.");
 }
 
 /**
@@ -183,34 +201,51 @@ export async function callTranslationModel(prompt: string): Promise<string> {
  */
 export function parseTranslationResponse(rawResponse: string): TranslationResult {
   try {
+    // Limpeza básica para remover possíveis caracteres invisíveis ou lixo
+    const cleanResponse = rawResponse.trim();
+    
     // Tenta extrair o JSON se houver texto extra (Markdown code blocks)
-    const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
-    const jsonString = jsonMatch ? jsonMatch[0] : rawResponse;
+    const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
+    const jsonString = jsonMatch ? jsonMatch[0] : cleanResponse;
     
     const parsed = JSON.parse(jsonString);
 
-    if (!parsed.translation || typeof parsed.translation !== "string") {
-      throw new Error("Formato de tradução inválido.");
+    // Validação mais flexível dos campos
+    const translation = parsed.translation || parsed.translatedText || parsed.text;
+    
+    if (!translation || typeof translation !== "string" || translation.length < 2) {
+      throw new Error("Conteúdo de tradução ausente ou inválido no JSON.");
     }
 
     return {
-      translatedText: parsed.translation,
-      detectedLanguage: parsed.detected_source_language || "Não identificado",
-      notes: Array.isArray(parsed.translator_notes) ? parsed.translator_notes : []
+      translatedText: translation,
+      detectedLanguage: parsed.detected_source_language || parsed.language || "Não identificado",
+      notes: Array.isArray(parsed.translator_notes) ? parsed.translator_notes : 
+             Array.isArray(parsed.notes) ? parsed.notes : []
     };
   } catch (error) {
     console.error("Erro ao interpretar resposta:", error, rawResponse);
     
-    // Fallback: se não for JSON mas houver texto, tenta usar o texto bruto como tradução
-    if (rawResponse && rawResponse.length > 10 && !rawResponse.includes("{")) {
+    // Fallback agressivo: se não for JSON mas houver texto substancial, usa o texto bruto
+    // Removemos possíveis marcas de JSON se o parser falhou
+    const fallbackText = rawResponse
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .replace(/\{"translation":/g, "")
+      .replace(/"detected_source_language":.*?,/g, "")
+      .replace(/"translator_notes":.*?\]/g, "")
+      .replace(/\}/g, "")
+      .trim();
+
+    if (fallbackText.length > 20) {
       return {
-        translatedText: rawResponse,
+        translatedText: fallbackText,
         detectedLanguage: "Não identificado",
-        notes: ["Recebemos uma resposta inesperada do modelo, exibindo conteúdo bruto."]
+        notes: ["Nota: A resposta do modelo não estava em formato JSON perfeito, mas o texto foi recuperado."]
       };
     }
     
-    throw new Error("Recebemos uma resposta inesperada do modelo.");
+    throw new Error("Recebemos uma resposta malformada do modelo que não pôde ser recuperada.");
   }
 }
 

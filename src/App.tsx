@@ -187,28 +187,40 @@ export default function App() {
           setTranslationProgress(progress.percentage);
           setProgressMessage(progress.message);
           
-          try {
-            const result = await translateText(
-              chunk.text, 
-              settings, 
-              (msg) => setProgressMessage(`Bloco ${i + 1}: ${msg}`)
-            );
-            
-            translatedChunks.push(result.translatedText);
-            if (result.notes) allNotes.push(...result.notes);
-            
-            if (result.detectedLanguage && i === 0) {
-              setDetectedLanguage(result.detectedLanguage);
+          let retryCount = 0;
+          const maxRetries = 2;
+          let success = false;
+
+          while (retryCount <= maxRetries && !success) {
+            try {
+              const result = await translateText(
+                chunk.text, 
+                settings, 
+                (msg) => setProgressMessage(`Bloco ${i + 1}${retryCount > 0 ? ` (Tentativa ${retryCount + 1})` : ""}: ${msg}`)
+              );
+              
+              translatedChunks.push(result.translatedText);
+              if (result.notes) allNotes.push(...result.notes);
+              
+              if (result.detectedLanguage && i === 0) {
+                setDetectedLanguage(result.detectedLanguage);
+              }
+              success = true;
+            } catch (chunkErr) {
+              retryCount++;
+              if (retryCount > maxRetries) {
+                const failure = handleDocumentTranslationFailure(chunkErr, { index: i, total: chunks.length });
+                setError(failure.message);
+                showToast(failure.message, "error");
+                // Se falhar após retentativas, interrompe o loop
+                break;
+              }
+              // Espera um pouco antes de tentar o mesmo bloco novamente
+              await new Promise(r => setTimeout(r, 1000 * retryCount));
             }
-          } catch (chunkErr) {
-            const failure = handleDocumentTranslationFailure(chunkErr, { index: i, total: chunks.length });
-            setError(failure.message);
-            showToast(failure.message, "error");
-            
-            // Se falhar, interrompe o loop mas mantém o que já foi traduzido até agora
-            // Opcionalmente poderíamos permitir "pular" o bloco, mas por segurança paramos.
-            break;
           }
+          
+          if (!success) break;
         }
 
         if (translatedChunks.length > 0) {
