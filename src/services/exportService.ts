@@ -1,6 +1,8 @@
 import { Project, TranslationEntry } from "./storageService";
 import { ChatMessage, TranslationSettings } from "./geminiService";
 import { DocumentMetadata } from "./documentService";
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 import { 
   Document, 
   Packer, 
@@ -23,7 +25,7 @@ export interface ExportOptions {
   includeChat: boolean;
   includeMetadata: boolean;
   includePageSeparation: boolean;
-  format: 'txt' | 'docx' | 'clipboard' | 'comparison';
+  format: 'txt' | 'docx' | 'pdf' | 'clipboard' | 'comparison';
 }
 
 export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
@@ -252,6 +254,88 @@ class ExportService {
   }
 
   /**
+   * Generates a PDF file.
+   */
+  async generatePdf(data: ExportData, options: ExportOptions): Promise<Blob> {
+    const doc = new jsPDF();
+    const margin = 20;
+    let y = 20;
+
+    // Helper for adding text with wrapping
+    const addText = (text: string, fontSize = 10, isBold = false, color = [0, 0, 0]) => {
+      doc.setFontSize(fontSize);
+      doc.setFont("helvetica", isBold ? "bold" : "normal");
+      doc.setTextColor(color[0], color[1], color[2]);
+      
+      const lines = doc.splitTextToSize(text, 170);
+      lines.forEach((line: string) => {
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(line, margin, y);
+        y += fontSize * 0.5;
+      });
+      y += 5;
+    };
+
+    // Header
+    addText("Tradutor Literário Contextual", 18, true, [15, 23, 42]);
+    addText(data.title, 14, true, [100, 100, 100]);
+    y += 5;
+
+    if (options.includeMetadata && data.metadata) {
+      addText("Metadados", 12, true);
+      if (data.metadata.originalFilename) addText(`Arquivo Original: ${data.metadata.originalFilename}`);
+      if (data.metadata.pageRange) addText(`Páginas: ${data.metadata.pageRange}`);
+      if (data.metadata.sourceLanguage) addText(`De: ${data.metadata.sourceLanguage}`);
+      if (data.metadata.targetLanguage) addText(`Para: ${data.metadata.targetLanguage}`);
+      y += 5;
+    }
+
+    if (options.includeSettings && data.settings) {
+      addText("Configurações", 12, true);
+      addText(`Modo: ${data.settings.mode} | Tom: ${data.settings.tone} | Adaptação: ${data.settings.culturalAdaptation}`);
+      y += 5;
+    }
+
+    // Main Content
+    if (options.format === 'comparison') {
+      addText("Comparação Bilíngue", 12, true);
+      (doc as any).autoTable({
+        startY: y,
+        head: [['Original', 'Tradução']],
+        body: [[data.sourceText, data.translatedText]],
+        margin: { left: margin, right: margin },
+        styles: { font: "helvetica", fontSize: 9, cellPadding: 5 },
+        headStyles: { fillColor: [15, 23, 42] },
+      });
+      y = (doc as any).lastAutoTable.finalY + 10;
+    } else {
+      if (options.includeOriginal) {
+        addText("Texto Original", 12, true);
+        addText(data.sourceText, 10);
+        y += 5;
+      }
+
+      if (options.includeTranslation) {
+        addText("Texto Traduzido", 12, true);
+        addText(data.translatedText, 10);
+        y += 5;
+      }
+    }
+
+    if (options.includeNotes && data.notes && data.notes.length > 0) {
+      addText("Notas do Tradutor", 12, true);
+      data.notes.forEach((note, i) => {
+        addText(`${i + 1}. ${note}`, 10);
+      });
+    }
+
+    return doc.output('blob');
+  }
+
+  /**
    * Triggers a file download.
    */
   downloadBlob(filename: string, blob: Blob) {
@@ -293,6 +377,12 @@ class ExportService {
     if (options.format === 'docx') {
       const blob = await this.generateDocx(data, options);
       this.downloadBlob(`${filename}.docx`, blob);
+      return true;
+    }
+
+    if (options.format === 'pdf') {
+      const blob = await this.generatePdf(data, options);
+      this.downloadBlob(`${filename}.pdf`, blob);
       return true;
     }
 

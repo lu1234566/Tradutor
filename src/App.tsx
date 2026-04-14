@@ -475,7 +475,36 @@ export default function App() {
   };
 
   const handleOpenExport = (entry?: TranslationEntry, project?: Project, allEntries?: TranslationEntry[]) => {
-    setExportData({ entry, project, allEntries });
+    let exportEntry = entry;
+    
+    // If no entry is provided (unsaved work), create a temporary one from current state
+    if (!exportEntry && !allEntries && (originalText || translatedText)) {
+      exportEntry = {
+        id: currentEntryId || "temp-export",
+        projectId: "",
+        title: entryTitle || "Tradução sem título",
+        sourceText: originalText,
+        translatedText: translatedText,
+        translatorNotes: notes,
+        adaptedExpressions: adaptedExpressions,
+        translationStrategy: translationStrategy,
+        toneDetected: toneDetected,
+        chatHistory: chatMessages,
+        sourceLanguage: settings.sourceLanguage,
+        targetLanguage: settings.targetLanguage,
+        translationMode: settings.mode,
+        tone: settings.tone,
+        culturalAdaptation: settings.culturalAdaptation,
+        preserveProperNames: settings.preserveNames,
+        showTranslatorNotes: settings.showNotes,
+        status: "Rascunho",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        manuallyEdited: false
+      };
+    }
+
+    setExportData({ entry: exportEntry, project, allEntries });
     setIsExportModalOpen(true);
   };
 
@@ -517,7 +546,7 @@ export default function App() {
         onResetSettings={handleResetSettings}
         onClear={() => setIsConfirmationOpen(true)}
         onSave={handleSaveClick}
-        onExport={() => setIsExportModalOpen(true)}
+        onExport={() => handleOpenExport()}
         onOpenProjects={() => setIsProjectManagerOpen(true)}
         viewPrefs={viewPrefs}
         onUpdateViewPrefs={updateViewPrefs}
@@ -698,25 +727,13 @@ export default function App() {
       )}
 
       {/* Overlays */}
-      {isProjectManagerOpen && (
-        <div className="fixed inset-0 z-[60] flex justify-end">
-          <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={() => setIsProjectManagerOpen(false)} />
-          <div className="relative w-full max-w-2xl h-full shadow-2xl">
-            <ProjectManager 
-              onLoadEntry={handleLoadEntry}
-              onClose={() => setIsProjectManagerOpen(false)}
-              onOpenExport={handleOpenExport}
-              viewPrefs={viewPrefs}
-            />
-          </div>
-        </div>
-      )}
-
       <ProjectManager 
         isOpen={isProjectManagerOpen}
         onClose={() => setIsProjectManagerOpen(false)}
         onLoadEntry={handleLoadEntry}
+        onOpenExport={handleOpenExport}
         currentEntryId={currentEntryId}
+        viewPrefs={viewPrefs}
       />
 
       {isSaveModalOpen && (

@@ -239,6 +239,29 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </button>
 
               <button 
+                onClick={() => handleExport('pdf')}
+                disabled={isExporting}
+                className={cn(
+                  "flex items-center justify-between bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl transition-all group",
+                  viewPrefs.density === 'compact' ? 'p-3' : 'p-4'
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "bg-white rounded-xl flex items-center justify-center text-slate-400 group-hover:text-brand-600 transition-colors shadow-sm",
+                    viewPrefs.density === 'compact' ? 'h-8 w-8' : 'h-10 w-10'
+                  )}>
+                    <FileCode className={viewPrefs.density === 'compact' ? 'h-4 w-4' : 'h-5 w-5'} />
+                  </div>
+                  <div className="text-left">
+                    <p className={cn("font-bold text-slate-800", viewPrefs.density === 'compact' ? 'text-xs' : 'text-sm')}>Exportar como PDF</p>
+                    <p className="text-[10px] text-slate-500">Arquivo pronto para impressão e leitura</p>
+                  </div>
+                </div>
+                <Download className="h-5 w-5 text-slate-200 group-hover:text-brand-500 transition-colors" />
+              </button>
+
+              <button 
                 onClick={() => handleExport('txt')}
                 disabled={isExporting}
                 className={cn(

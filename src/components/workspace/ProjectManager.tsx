@@ -11,9 +11,11 @@ import {
   Edit2,
   Copy,
   X,
-  Globe
+  Globe,
+  Download
 } from "lucide-react";
 import { Project, TranslationEntry, storageService } from "../../services/storageService";
+import { ViewPreferences, viewService } from "../../services/viewService";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { motion, AnimatePresence } from "motion/react";
@@ -23,15 +25,20 @@ interface ProjectManagerProps {
   isOpen: boolean;
   onClose: () => void;
   onLoadEntry: (entry: TranslationEntry) => void;
+  onOpenExport?: (entry?: TranslationEntry, project?: Project, allEntries?: TranslationEntry[]) => void;
   currentEntryId?: string | null;
+  viewPrefs?: ViewPreferences;
 }
 
 export const ProjectManager: React.FC<ProjectManagerProps> = ({ 
   isOpen, 
   onClose, 
   onLoadEntry,
-  currentEntryId 
+  onOpenExport,
+  currentEntryId,
+  viewPrefs
 }) => {
+  const densityClasses = viewPrefs ? viewService.getDensityClasses(viewPrefs.density) : { card: "", label: "", container: "", text: "" };
   const [projects, setProjects] = useState<Project[]>([]);
   const [entries, setEntries] = useState<TranslationEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -255,6 +262,15 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({
                         >
                           Abrir
                         </button>
+                        {onOpenExport && (
+                          <button 
+                            onClick={() => onOpenExport(entry)}
+                            className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all"
+                            title="Exportar"
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
+                        )}
                         <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
                           <MoreVertical className="h-4 w-4" />
                         </button>
