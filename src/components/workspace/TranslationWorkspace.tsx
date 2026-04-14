@@ -11,6 +11,7 @@ import {
   Columns, 
   Layout, 
   CheckCircle2,
+  Check,
   History,
   Save,
   FolderOpen,
@@ -19,7 +20,9 @@ import {
   BookOpen,
   FileText,
   FileUp,
-  Type
+  Type,
+  Edit2,
+  Download
 } from "lucide-react";
 import { countCharacters, countWords, cn } from "@/src/utils";
 import { DocumentUpload } from "./DocumentUpload";
@@ -48,11 +51,17 @@ interface TranslationWorkspaceProps {
   onOpenProjects: () => void;
   onOpenExport: (entry?: any, project?: any, allEntries?: any[]) => void;
   onDocumentProcessed: (text: string, metadata: DocumentMetadata) => void;
+  entryTitle: string;
+  onEntryTitleChange: (title: string) => void;
   notes: string[];
+  adaptedExpressions?: { original: string; adapted: string; explanation: string }[];
+  translationStrategy?: string;
+  toneDetected?: string;
   showNotes: boolean;
   hasUnsavedChanges?: boolean;
   currentEntry?: any;
   viewPrefs: ViewPreferences;
+  translationBlocks?: any[];
 }
 
 export const TranslationWorkspace: React.FC<TranslationWorkspaceProps> = ({
@@ -71,11 +80,17 @@ export const TranslationWorkspace: React.FC<TranslationWorkspaceProps> = ({
   onOpenProjects,
   onOpenExport,
   onDocumentProcessed,
+  entryTitle,
+  onEntryTitleChange,
   notes,
+  adaptedExpressions = [],
+  translationStrategy,
+  toneDetected,
   showNotes,
   hasUnsavedChanges,
   currentEntry,
-  viewPrefs
+  viewPrefs,
+  translationBlocks = []
 }) => {
   const [copied, setCopied] = useState(false);
   const [viewMode, setViewMode] = useState<"stack" | "compare">("stack");
@@ -114,40 +129,55 @@ export const TranslationWorkspace: React.FC<TranslationWorkspaceProps> = ({
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         className={cn(
-          "flex items-center justify-between bg-white/50 backdrop-blur-sm p-2 rounded-2xl border border-slate-100 shadow-premium",
+          "flex flex-col sm:flex-row items-center justify-between bg-white p-3 rounded-2xl border border-slate-100 shadow-soft gap-4",
           densityClasses.card
         )}
       >
-        <div className="flex items-center gap-1">
+        <div className="flex-1 w-full flex items-center gap-4 px-3">
+          <div className="p-2 bg-brand-50 text-brand-700 rounded-xl shadow-sm">
+            <Edit2 className="h-4 w-4" />
+          </div>
+          <input 
+            type="text" 
+            placeholder="Título do Projeto ou Capítulo..."
+            value={entryTitle}
+            onChange={(e) => onEntryTitleChange(e.target.value)}
+            className="flex-1 bg-transparent border-none outline-none font-semibold text-slate-700 placeholder:text-slate-300 text-sm tracking-tight"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
           <button
             onClick={onOpenProjects}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 text-[11px] font-bold text-slate-500 hover:text-brand-800 hover:bg-brand-50 rounded-xl transition-all uppercase tracking-wider"
           >
             <FolderOpen className="h-4 w-4" />
             Projetos
           </button>
-        </div>
-        <div className="flex items-center gap-2">
+          
+          <div className="h-6 w-px bg-slate-100 mx-1" />
+
           <button
             onClick={() => onOpenExport(currentEntry)}
             disabled={!translatedText && !originalText}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-all disabled:opacity-30"
+            className="flex items-center gap-2 px-4 py-2.5 text-[11px] font-bold text-slate-500 hover:text-brand-800 hover:bg-brand-50 rounded-xl transition-all disabled:opacity-30 uppercase tracking-wider"
           >
             <Share2 className="h-4 w-4" />
             Exportar
           </button>
+          
           {translatedText && (
             <button
               onClick={onSave}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all",
+                "flex items-center gap-2 px-5 py-2.5 text-[11px] font-bold rounded-xl transition-all uppercase tracking-wider",
                 hasUnsavedChanges 
-                  ? "bg-brand-50 text-brand-600 hover:bg-brand-100" 
-                  : "text-slate-400 hover:bg-slate-100"
+                  ? "bg-brand-800 text-white hover:bg-brand-900 shadow-premium" 
+                  : "text-emerald-600 bg-emerald-50"
               )}
             >
               <Save className="h-4 w-4" />
-              {hasUnsavedChanges ? "Salvar Alterações" : "Salvo"}
+              {hasUnsavedChanges ? "Salvar" : "Salvo"}
             </button>
           )}
         </div>
@@ -338,28 +368,28 @@ export const TranslationWorkspace: React.FC<TranslationWorkspaceProps> = ({
           viewPrefs.density === 'compact' ? 'gap-2' : 'gap-4',
           !translatedText && !isTranslating && viewMode === "stack" && "hidden lg:flex"
         )}>
-          <div className="flex items-center justify-between px-1">
+          <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-3">
               <h3 className={cn(
                 "font-bold text-slate-400 uppercase tracking-[0.2em]",
                 densityClasses.label
-              )}>Texto Traduzido</h3>
+              )}>Tradução Literária</h3>
               {detectedLanguage && !isTranslating && (
-                <span className="text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                  Detectado: {detectedLanguage}
+                <span className="text-[9px] font-bold text-brand-500 bg-brand-50 px-2 py-0.5 rounded-md uppercase tracking-wider border border-brand-100/50">
+                  {detectedLanguage}
                 </span>
               )}
             </div>
             {translatedText && !isTranslating && (
               <div className="flex items-center gap-1.5 text-emerald-600">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                <span className="text-[10px] font-bold uppercase tracking-widest">Concluído</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest">Refinado</span>
               </div>
             )}
           </div>
 
           <div className={cn(
-            "relative group glass-card rounded-[2rem] overflow-hidden bg-slate-50/30 transition-all duration-300",
+            "relative group rounded-[2.5rem] border border-slate-100 bg-white shadow-soft transition-all duration-500 hover:shadow-premium hover:border-brand-100 overflow-hidden",
             densityClasses.card
           )}>
             <TextArea
@@ -375,52 +405,85 @@ export const TranslationWorkspace: React.FC<TranslationWorkspaceProps> = ({
             
             {/* Empty State for Output */}
             {!translatedText && !isTranslating && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center gap-4">
-                <div className="h-16 w-16 bg-white rounded-3xl flex items-center justify-center text-slate-200 shadow-premium">
-                  <FileText className="h-8 w-8" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center gap-6 paper-texture">
+                <div className="h-20 w-20 bg-slate-50 rounded-[2rem] flex items-center justify-center text-slate-200 shadow-soft border border-slate-100">
+                  <BookOpen className="h-10 w-10" />
                 </div>
-                <div className="max-w-xs">
-                  <p className="text-sm font-medium text-slate-400 leading-relaxed">
-                    Clique em <span className="text-brand-600 font-bold">Traduzir</span> para gerar uma versão literária com nuances contextuais.
+                <div className="max-w-xs space-y-2">
+                  <p className="text-sm font-semibold text-slate-500 leading-relaxed">
+                    Pronto para a metamorfose literária.
+                  </p>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Clique em <span className="text-brand-700 font-bold">Traduzir</span> para iniciar a análise contextual.
                   </p>
                 </div>
               </div>
             )}
             
             {translatedText && !isTranslating && (
-              <div className="absolute bottom-6 right-6 flex gap-2">
-                <Button size="sm" variant="secondary" onClick={handleCopy} className="rounded-full bg-white/90 backdrop-blur-sm">
-                  <Copy className="h-3.5 w-3.5 mr-1.5" />
+              <div className="absolute bottom-8 right-8 flex gap-2">
+                <Button size="sm" variant="secondary" onClick={handleCopy} className="rounded-full bg-white/90 backdrop-blur-sm shadow-premium">
+                  {copied ? <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
                   {copied ? "Copiado" : "Copiar"}
                 </Button>
               </div>
             )}
 
             {isTranslating && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px] gap-6">
-                <div className="flex flex-col items-center gap-4 w-full max-w-[240px]">
-                  {translationProgress > 0 ? (
-                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[2px] gap-8 paper-texture">
+                <div className="flex flex-col items-center gap-6 w-full max-w-[320px]">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="relative h-16 w-16">
+                      <div className="absolute inset-0 border-4 border-brand-100 rounded-full" />
                       <motion.div 
-                        className="h-full bg-brand-600"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${translationProgress}%` }}
-                        transition={{ duration: 0.3 }}
+                        className="absolute inset-0 border-4 border-brand-800 rounded-full border-t-transparent"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                       />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Sparkles className="h-6 w-6 text-brand-800 animate-pulse" />
+                      </div>
                     </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <div className="w-3 h-3 bg-brand-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                      <div className="w-3 h-3 bg-brand-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                      <div className="w-3 h-3 bg-brand-600 rounded-full animate-bounce"></div>
+                    <span className="text-[11px] font-bold text-brand-900 uppercase tracking-[0.2em] animate-pulse">
+                      {translationProgress > 0 ? `${translationProgress}%` : "Iniciando..."}
+                    </span>
+                  </div>
+
+                  {translationProgress > 0 && (
+                    <div className="w-full space-y-4">
+                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
+                        <motion.div 
+                          className="h-full bg-brand-800"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${translationProgress}%` }}
+                          transition={{ duration: 0.5 }}
+                        />
+                      </div>
+                      
+                      {/* Block Grid Progress */}
+                      {translationBlocks.length > 1 && (
+                        <div className="flex flex-wrap justify-center gap-1.5 px-4">
+                          {translationBlocks.map((block, idx) => (
+                            <div 
+                              key={block.id} 
+                              className={cn(
+                                "h-2 w-2 rounded-full transition-all duration-500",
+                                block.status === 'success' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" :
+                                block.status === 'translating' ? "bg-brand-500 animate-pulse scale-125" :
+                                block.status === 'retrying' ? "bg-amber-500 animate-pulse" :
+                                block.status === 'failed' ? "bg-red-500" :
+                                "bg-slate-200"
+                              )}
+                              title={`Bloco ${idx + 1}: ${block.status}`}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                   
                   <div className="flex flex-col items-center gap-2">
-                    <p className="text-sm font-bold text-brand-600 uppercase tracking-widest animate-pulse">
-                      {translationProgress > 0 ? `${translationProgress}%` : "Refinando Estilo"}
-                    </p>
-                    <p className="text-xs font-medium text-slate-500 text-center px-4">
+                    <p className="text-xs font-medium text-slate-500 text-center px-4 leading-relaxed">
                       {progressMessage || "Analisando contexto e nuances culturais..."}
                     </p>
                   </div>
@@ -465,6 +528,9 @@ export const TranslationWorkspace: React.FC<TranslationWorkspaceProps> = ({
       {/* Translator Notes (Integrated) */}
       <TranslatorNotes
         notes={notes}
+        adaptedExpressions={adaptedExpressions}
+        translationStrategy={translationStrategy}
+        toneDetected={toneDetected}
         isVisible={showNotes && translatedText.length > 0}
         viewPrefs={viewPrefs}
       />

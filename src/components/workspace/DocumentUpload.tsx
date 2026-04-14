@@ -144,36 +144,40 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
             onDrop={onDrop}
             onClick={() => fileInputRef.current?.click()}
             className={cn(
-              "relative group cursor-pointer border-2 border-dashed rounded-[2rem] transition-all duration-500 flex flex-col items-center justify-center text-center gap-4",
+              "relative group cursor-pointer border-2 border-dashed rounded-[2.5rem] transition-all duration-500 flex flex-col items-center justify-center text-center gap-6 paper-texture",
               isDragging 
-                ? "border-brand-500 bg-brand-50/50 scale-[1.02]" 
-                : "border-slate-200 hover:border-brand-300 hover:bg-slate-50/50",
-              viewPrefs.density === 'compact' ? 'p-6' : viewPrefs.density === 'reading' ? 'p-16' : 'p-8 md:p-12'
+                ? "border-brand-400 bg-brand-50/50 scale-[1.01]" 
+                : "border-slate-100 hover:border-brand-200 hover:bg-white hover:shadow-premium",
+              viewPrefs.density === 'compact' ? 'p-8' : viewPrefs.density === 'reading' ? 'p-20' : 'p-10 md:p-16'
             )}
           >
             <input 
               type="file" 
               ref={fileInputRef}
               onChange={onFileChange}
-              accept=".pdf,.txt"
+              accept=".pdf,.txt,.docx,.md"
               className="hidden"
             />
             
             <div className={cn(
-              "bg-brand-50 rounded-3xl flex items-center justify-center text-brand-600 group-hover:scale-110 transition-transform duration-500 shadow-sm",
-              viewPrefs.density === 'compact' ? 'h-12 w-12' : 'h-16 w-16'
+              "bg-brand-50 rounded-[2rem] flex items-center justify-center text-brand-600 group-hover:scale-110 transition-transform duration-700 shadow-soft",
+              viewPrefs.density === 'compact' ? 'h-14 w-14' : 'h-20 w-20'
             )}>
-              <FileUp className={densityClasses.icon} />
+              <FileUp className={cn("h-8 w-8", densityClasses.icon)} />
             </div>
             
-            <div className="space-y-2">
-              <h3 className={cn("font-serif font-bold text-slate-800", densityClasses.heading)}>Importar Documento</h3>
-              <p className={cn("text-slate-500 max-w-xs leading-relaxed", densityClasses.text)}>
-                Arraste um PDF ou clique para selecionar. <br />
-                <span className={cn("font-bold text-slate-400 uppercase tracking-widest mt-2 block", densityClasses.label)}>Formatos: PDF, TXT (DOCX em breve)</span>
+            <div className="space-y-3">
+              <h3 className={cn("font-serif font-semibold text-ink text-xl", densityClasses.heading)}>Importar Manuscrito</h3>
+              <p className={cn("text-slate-400 max-w-xs leading-relaxed font-medium", densityClasses.text)}>
+                Arraste seu documento aqui ou clique para explorar seus arquivos.
               </p>
+              <div className={cn("flex flex-wrap justify-center gap-2 pt-2", densityClasses.label)}>
+                {['PDF', 'TXT', 'DOCX', 'MD'].map(ext => (
+                  <span key={ext} className="px-2 py-0.5 bg-slate-50 text-slate-400 rounded-md border border-slate-100 text-[9px] font-bold tracking-widest">{ext}</span>
+                ))}
+              </div>
             </div>
-            <div className={cn("font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-100 uppercase tracking-widest", densityClasses.label)}>
+            <div className={cn("font-bold text-slate-300 text-[10px] uppercase tracking-[0.2em]", densityClasses.label)}>
               Limite de 20MB
             </div>
           </motion.div>

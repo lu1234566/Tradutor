@@ -52,26 +52,26 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'panel', label: 'Painel', icon: <Layout className="h-4 w-4" /> },
   ];
   return (
-    <header id="app-header" className="sticky top-0 z-40 w-full border-b border-slate-100/50 bg-white/70 backdrop-blur-2xl">
-      <div className="flex h-16 items-center px-6 md:px-10 max-w-[1600px] mx-auto justify-between">
+    <header id="app-header" className="sticky top-0 z-40 w-full border-b border-slate-100/50 bg-paper/80 backdrop-blur-2xl">
+      <div className="flex h-20 items-center px-6 md:px-10 max-w-[1600px] mx-auto justify-between">
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="flex items-center gap-4"
+          className="flex items-center gap-5"
         >
           <motion.div 
             whileHover={{ rotate: 5, scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-xl shadow-brand-200/50 cursor-pointer"
+            className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-900 text-white shadow-premium cursor-pointer"
           >
-            <BookOpenText className="h-5.5 w-5.5" />
+            <BookOpenText className="h-6 w-6" />
           </motion.div>
           <div className="flex flex-col">
-            <h1 className="text-lg font-serif font-bold text-gradient tracking-tight leading-none">
-              Tradutor Literário Contextual
+            <h1 className="text-xl font-serif font-semibold text-ink tracking-tight leading-none">
+              Tradutor Literário
             </h1>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.25em] mt-1">
-              Inteligência Narrativa & Adaptação Cultural
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-1.5">
+              Inteligência Contextual
             </p>
           </div>
         </motion.div>
@@ -79,15 +79,15 @@ export const Header: React.FC<HeaderProps> = ({
         <motion.div 
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="flex items-center gap-2 lg:gap-4"
+          className="flex items-center gap-3 lg:gap-6"
         >
           {/* View Preferences Toggle */}
           <div className="relative">
             <button
               onClick={() => setIsViewMenuOpen(!isViewMenuOpen)}
               className={cn(
-                "flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-xs font-bold uppercase tracking-wider",
-                isViewMenuOpen ? "bg-brand-50 text-brand-600" : "text-slate-500 hover:bg-slate-50"
+                "flex items-center gap-2.5 px-4 py-2.5 rounded-xl transition-all text-[11px] font-bold uppercase tracking-wider",
+                isViewMenuOpen ? "bg-brand-100 text-brand-900" : "text-slate-500 hover:bg-slate-50"
               )}
             >
               <Layout className="h-4 w-4" />

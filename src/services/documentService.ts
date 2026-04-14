@@ -1,4 +1,5 @@
 import * as pdfjs from 'pdfjs-dist';
+import mammoth from 'mammoth';
 import { performOcrOnImage } from './geminiService';
 
 // Configure PDF.js worker using a more robust loading strategy for Vite
@@ -12,7 +13,7 @@ try {
   pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 }
 
-export type DocumentType = 'pdf' | 'txt' | 'docx' | 'epub' | 'unknown';
+export type DocumentType = 'pdf' | 'txt' | 'docx' | 'md' | 'epub' | 'unknown';
 export type ExtractionStatus = 'idle' | 'extracting' | 'success' | 'error';
 
 export interface PageContent {
@@ -80,22 +81,10 @@ export const normalizeExtractedText = (text: string): string => {
   if (!text) return "";
 
   return text
-    // Remove espaços duplicados excessivos
+    // Remove espaços horizontais duplicados, mas mantém quebras
     .replace(/[ \t]+/g, ' ')
-    // Remove quebras de linha múltiplas excessivas (mais de 3)
-    .replace(/\n{4,}/g, '\n\n\n')
-    // Tenta corrigir quebras de linha no meio de frases (heurística leve)
-    .split('\n')
-    .reduce((acc, current, index, array) => {
-      if (index === 0) return current;
-      const prev = array[index - 1].trim();
-      const curr = current.trim();
-      
-      if (prev && curr && !/[.!?:]/.test(prev.slice(-1)) && /^[a-z]/.test(curr)) {
-        return acc + ' ' + curr;
-      }
-      return acc + '\n' + current;
-    }, "")
+    // Normaliza quebras de linha excessivas (mais de 2 vira parágrafo duplo)
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 };
 
@@ -113,10 +102,10 @@ export const validateUploadedFile = (file: File): { valid: boolean; error?: stri
   }
 
   const extension = file.name.split('.').pop()?.toLowerCase();
-  const supportedExtensions = ['pdf', 'txt'];
+  const supportedExtensions = ['pdf', 'txt', 'docx', 'md'];
 
   if (!extension || !supportedExtensions.includes(extension)) {
-    if (['docx', 'epub'].includes(extension || '')) {
+    if (['epub'].includes(extension || '')) {
       return { valid: false, error: `O formato .${extension} ainda não é suportado para leitura direta, mas você pode copiar o texto manualmente.` };
     }
     return { valid: false, error: "Este formato de arquivo não é suportado para extração automática." };
@@ -173,6 +162,7 @@ export const getDocumentType = (fileName: string): DocumentType => {
     case 'pdf': return 'pdf';
     case 'txt': return 'txt';
     case 'docx': return 'docx';
+    case 'md': return 'md';
     case 'epub': return 'epub';
     default: return 'unknown';
   }
@@ -317,6 +307,20 @@ const extractTextFromTXT = async (file: File): Promise<{ text: string }> => {
   });
 };
 
+const extractTextFromDOCX = async (file: File): Promise<{ text: string }> => {
+  const arrayBuffer = await file.arrayBuffer();
+  try {
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    if (!result.value.trim()) {
+      throw new Error("O arquivo DOCX parece não conter texto extraível.");
+    }
+    return { text: normalizeExtractedText(result.value) };
+  } catch (error) {
+    console.error("Error extracting DOCX text:", error);
+    throw new Error("Falha ao ler o arquivo DOCX. Certifique-se de que não está corrompido.");
+  }
+};
+
 export const processUploadedDocument = async (
   file: File, 
   onProgress?: (msg: string) => void
@@ -334,8 +338,14 @@ export const processUploadedDocument = async (
       pages = result.pages;
       fullText = result.fullText;
       pageCount = result.pageCount;
-    } else if (type === 'txt') {
+    } else if (type === 'txt' || type === 'md') {
       const result = await extractTextFromTXT(file);
+      fullText = result.text;
+      pages = [{ pageNumber: 1, text: fullText }];
+      pageCount = 1;
+    } else if (type === 'docx') {
+      onProgress?.("Extraindo texto do documento Word...");
+      const result = await extractTextFromDOCX(file);
       fullText = result.text;
       pages = [{ pageNumber: 1, text: fullText }];
       pageCount = 1;
@@ -374,6 +384,10 @@ export interface DocumentChunk {
   text: string;
   index: number;
   total: number;
+  status: 'pending' | 'translating' | 'success' | 'retrying' | 'failed';
+  attempts: number;
+  error?: string;
+  translatedText?: string;
 }
 
 /**
@@ -408,47 +422,89 @@ export const getDocumentTranslationScopeText = (
 };
 
 /**
- * Divide um texto grande em blocos menores respeitando parágrafos.
- * Limite sugerido: ~6000 caracteres por bloco para manter estabilidade e contexto.
+ * Divide um texto grande em blocos menores respeitando parágrafos e diálogos.
+ * Prioriza manter a estrutura literária intacta.
  */
-export const splitLargeDocumentIntoChunks = (text: string, chunkSize: number = 6000): DocumentChunk[] => {
-  if (text.length <= chunkSize) {
-    return [{ id: crypto.randomUUID(), text, index: 0, total: 1 }];
+export const splitLargeDocumentIntoChunks = (text: string, chunkSize: number = 5000): DocumentChunk[] => {
+  if (!text || !text.trim()) return [];
+
+  // Limpeza inicial: remove espaços em branco no início/fim, mas preserva quebras internas
+  const sourceText = text.trim();
+
+  if (sourceText.length <= chunkSize) {
+    return [{ 
+      id: crypto.randomUUID(), 
+      text: sourceText, 
+      index: 0, 
+      total: 1,
+      status: 'pending',
+      attempts: 0
+    }];
   }
 
   const chunks: DocumentChunk[] = [];
-  let remainingText = text;
+  let remainingText = sourceText;
   let currentIndex = 0;
 
   while (remainingText.length > 0) {
+    // Se o que sobrou cabe num bloco, adiciona e encerra
     if (remainingText.length <= chunkSize) {
-      chunks.push({ id: crypto.randomUUID(), text: remainingText, index: currentIndex, total: 0 });
+      chunks.push({ 
+        id: crypto.randomUUID(), 
+        text: remainingText, 
+        index: currentIndex, 
+        total: 0,
+        status: 'pending',
+        attempts: 0
+      });
       break;
     }
 
-    // Tenta cortar em um parágrafo próximo ao limite
+    // Estratégia de corte inteligente:
+    // 1. Tenta cortar em parágrafo duplo (\n\n) - ideal para manter blocos narrativos
     let splitIndex = remainingText.lastIndexOf('\n\n', chunkSize);
     
-    // Se não achar parágrafo duplo, tenta quebra de linha simples
-    if (splitIndex === -1 || splitIndex < chunkSize * 0.7) {
+    // 2. Se não achou parágrafo duplo ou o corte ficou muito pequeno (menos de 40% do chunk), 
+    // tenta quebra de linha simples (\n) - bom para diálogos
+    if (splitIndex === -1 || splitIndex < chunkSize * 0.4) {
       splitIndex = remainingText.lastIndexOf('\n', chunkSize);
     }
 
-    // Se ainda não achar, corta no espaço
-    if (splitIndex === -1 || splitIndex < chunkSize * 0.7) {
+    // 3. Se ainda não achou ou corte pequeno, tenta fim de frase (. )
+    if (splitIndex === -1 || splitIndex < chunkSize * 0.4) {
+      const lastDot = remainingText.lastIndexOf('. ', chunkSize);
+      const lastExcl = remainingText.lastIndexOf('! ', chunkSize);
+      const lastQuest = remainingText.lastIndexOf('? ', chunkSize);
+      splitIndex = Math.max(lastDot, lastExcl, lastQuest);
+      if (splitIndex !== -1) splitIndex += 1; // Inclui o ponto
+    }
+
+    // 4. Se ainda nada, tenta espaço simples
+    if (splitIndex === -1 || splitIndex < chunkSize * 0.4) {
       splitIndex = remainingText.lastIndexOf(' ', chunkSize);
     }
 
-    // Fallback: corta no limite exato
+    // 5. Fallback absoluto: corta no limite exato (raro em textos literários)
     if (splitIndex === -1) {
       splitIndex = chunkSize;
     }
 
     const chunkText = remainingText.substring(0, splitIndex).trim();
-    chunks.push({ id: crypto.randomUUID(), text: chunkText, index: currentIndex, total: 0 });
+    
+    // Validação: ignora blocos vazios ou apenas com espaços
+    if (chunkText.length > 0) {
+      chunks.push({ 
+        id: crypto.randomUUID(), 
+        text: chunkText, 
+        index: currentIndex, 
+        total: 0,
+        status: 'pending',
+        attempts: 0
+      });
+      currentIndex++;
+    }
     
     remainingText = remainingText.substring(splitIndex).trim();
-    currentIndex++;
   }
 
   // Atualiza o total em todos os blocos

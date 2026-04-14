@@ -14,14 +14,14 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || isLoading}
         className={cn(
-          "inline-flex items-center justify-center rounded-xl font-bold transition-all duration-200 active:scale-[0.96] hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none disabled:scale-100 uppercase tracking-wider",
+          "inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-300 active:scale-[0.97] hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-50 disabled:pointer-events-none disabled:scale-100 uppercase tracking-[0.08em]",
           {
-            "bg-brand-600 text-white hover:bg-brand-700 shadow-lg shadow-brand-200/50 hover:shadow-brand-300/60": variant === "primary",
-            "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm hover:shadow-md": variant === "secondary",
+            "bg-brand-800 text-white hover:bg-brand-900 shadow-premium hover:shadow-lg": variant === "primary",
+            "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-soft": variant === "secondary",
             "bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-900": variant === "ghost",
-            "h-8 px-4 text-[10px]": size === "sm",
-            "h-11 px-6 py-2 text-xs": size === "md",
-            "h-14 px-8 py-4 text-sm": size === "lg",
+            "h-9 px-4 text-[10px]": size === "sm",
+            "h-11 px-6 py-2 text-[11px]": size === "md",
+            "h-14 px-8 py-4 text-xs": size === "lg",
           },
           className
         )}

@@ -28,6 +28,9 @@ export interface TranslationEntry {
   preserveProperNames: boolean;
   showTranslatorNotes: boolean;
   translatorNotes: string[];
+  adaptedExpressions?: { original: string; adapted: string; explanation: string }[];
+  translationStrategy?: string;
+  toneDetected?: string;
   status: EntryStatus;
   chatHistory: ChatMessage[];
   createdAt: number;

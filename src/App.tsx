@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { cn } from "./utils";
 import { 
   translateText, 
+  translateTextFallback,
   TranslationSettings, 
   ChatMessage, 
   buildTranslationChatPrompt, 
@@ -69,12 +70,17 @@ export default function App() {
 
   const [originalText, setOriginalText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
+  const [entryTitle, setEntryTitle] = useState("");
   const [detectedLanguage, setDetectedLanguage] = useState<string | undefined>(undefined);
   const [isTranslating, setIsTranslating] = useState(false);
   const [progressMessage, setProgressMessage] = useState("");
   const [translationProgress, setTranslationProgress] = useState(0);
+  const [translationBlocks, setTranslationBlocks] = useState<DocumentChunk[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState<string[]>([]);
+  const [adaptedExpressions, setAdaptedExpressions] = useState<{ original: string; adapted: string; explanation: string }[]>([]);
+  const [translationStrategy, setTranslationStrategy] = useState("");
+  const [toneDetected, setToneDetected] = useState("");
 
   // Chat State
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -92,6 +98,11 @@ export default function App() {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
+  const [recentEntries, setRecentEntries] = useState<TranslationEntry[]>([]);
+
+  useEffect(() => {
+    setRecentEntries(storageService.listAllEntries().sort((a, b) => b.updatedAt - a.updatedAt));
+  }, [isProjectManagerOpen, isSaveModalOpen]);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [exportData, setExportData] = useState<{
     entry?: TranslationEntry;
@@ -110,7 +121,11 @@ export default function App() {
   const confirmClear = () => {
     setOriginalText("");
     setTranslatedText("");
+    setEntryTitle("");
     setNotes([]);
+    setAdaptedExpressions([]);
+    setTranslationStrategy("");
+    setToneDetected("");
     setError(null);
     setChatMessages([]);
     setCurrentEntryId(null);
@@ -167,6 +182,9 @@ export default function App() {
     setTranslatedText("");
     setDetectedLanguage(undefined);
     setNotes([]);
+    setAdaptedExpressions([]);
+    setTranslationStrategy("");
+    setToneDetected("");
     
     // Se for uma nova tradução "do zero" (sem entrada carregada), limpa o chat
     if (!currentEntryId) {
@@ -175,72 +193,106 @@ export default function App() {
     
     try {
       // Se o texto for muito grande, divide em blocos
-      const CHUNK_SIZE = 6000;
+      const CHUNK_SIZE = 5000;
       if (textToTranslate.length > CHUNK_SIZE) {
         const chunks = splitLargeDocumentIntoChunks(textToTranslate, CHUNK_SIZE);
-        const translatedChunks: string[] = [];
+        setTranslationBlocks(chunks);
+        
         const allNotes: string[] = [];
+        const allAdapted: { original: string; adapted: string; explanation: string }[] = [];
+        let lastStrategy = "";
+        let lastTone = "";
+        const finalTranslatedChunks: string[] = new Array(chunks.length).fill("");
 
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
-          const progress = buildDocumentProgressState(i + 1, chunks.length, "Traduzindo");
+          
+          // Atualiza status do bloco para 'translating'
+          setTranslationBlocks(prev => prev.map((c, idx) => idx === i ? { ...c, status: 'translating' } : c));
+          
+          const progress = buildDocumentProgressState(i + 1, chunks.length, "Processando Bloco");
           setTranslationProgress(progress.percentage);
           setProgressMessage(progress.message);
           
           let retryCount = 0;
           const maxRetries = 2;
           let success = false;
+          let lastChunkError = "";
 
           while (retryCount <= maxRetries && !success) {
             try {
-              const result = await translateText(
-                chunk.text, 
-                settings, 
-                (msg) => setProgressMessage(`Bloco ${i + 1}${retryCount > 0 ? ` (Tentativa ${retryCount + 1})` : ""}: ${msg}`)
-              );
+              const currentStatus = retryCount > 0 ? 'retrying' : 'translating';
+              setTranslationBlocks(prev => prev.map((c, idx) => idx === i ? { ...c, status: currentStatus, attempts: retryCount } : c));
+
+              // Na última tentativa, usa o fallback
+              const result = retryCount === maxRetries 
+                ? await translateTextFallback(chunk.text, settings)
+                : await translateText(
+                    chunk.text, 
+                    settings, 
+                    (msg) => setProgressMessage(`Bloco ${i + 1}${retryCount > 0 ? ` (Tentativa ${retryCount + 1})` : ""}: ${msg}`)
+                  );
               
-              translatedChunks.push(result.translatedText);
+              finalTranslatedChunks[i] = result.translatedText;
               if (result.notes) allNotes.push(...result.notes);
+              if (result.adaptedExpressions) allAdapted.push(...result.adaptedExpressions);
+              if (result.translationStrategy) lastStrategy = result.translationStrategy;
+              if (result.toneDetected) lastTone = result.toneDetected;
               
               if (result.detectedLanguage && i === 0) {
                 setDetectedLanguage(result.detectedLanguage);
               }
+              
+              setTranslationBlocks(prev => prev.map((c, idx) => idx === i ? { ...c, status: 'success', translatedText: result.translatedText } : c));
               success = true;
-            } catch (chunkErr) {
+            } catch (chunkErr: any) {
               retryCount++;
+              lastChunkError = chunkErr instanceof Error ? chunkErr.message : String(chunkErr);
+              
               if (retryCount > maxRetries) {
+                setTranslationBlocks(prev => prev.map((c, idx) => idx === i ? { ...c, status: 'failed', error: lastChunkError } : c));
                 const failure = handleDocumentTranslationFailure(chunkErr, { index: i, total: chunks.length });
-                setError(failure.message);
-                showToast(failure.message, "error");
-                // Se falhar após retentativas, interrompe o loop
+                // Não interrompe a tradução inteira, apenas registra o erro do bloco
+                console.warn(`Bloco ${i + 1} falhou após todas as tentativas:`, lastChunkError);
                 break;
               }
-              // Espera um pouco antes de tentar o mesmo bloco novamente
+              
+              // Espera exponencial
               await new Promise(r => setTimeout(r, 1000 * retryCount));
             }
           }
           
-          if (!success) break;
+          // Atualiza o texto traduzido parcial para o usuário ver progresso real
+          setTranslatedText(finalTranslatedChunks.filter(t => t !== "").join("\n\n"));
         }
 
-        if (translatedChunks.length > 0) {
-          const finalTranslation = translatedChunks.join("\n\n");
+        const successfulChunks = finalTranslatedChunks.filter(t => t !== "");
+        if (successfulChunks.length > 0) {
+          const finalTranslation = finalTranslatedChunks.join("\n\n").trim();
           setTranslatedText(finalTranslation);
-          setNotes(Array.from(new Set(allNotes))); // Remove duplicatas
+          setNotes(Array.from(new Set(allNotes)));
+          setAdaptedExpressions(allAdapted);
+          setTranslationStrategy(lastStrategy);
+          setToneDetected(lastTone);
           
-          if (translatedChunks.length === chunks.length) {
+          if (successfulChunks.length === chunks.length) {
             setTranslationProgress(100);
-            setProgressMessage("Tradução concluída!");
+            setProgressMessage("Tradução concluída com sucesso!");
+            showToast("Tradução concluída!");
           } else {
-            setProgressMessage(`Tradução parcial concluída (${translatedChunks.length} de ${chunks.length} blocos).`);
+            setProgressMessage(`Tradução parcial concluída (${successfulChunks.length} de ${chunks.length} blocos).`);
+            setError(`Alguns blocos (${chunks.length - successfulChunks.length}) não puderam ser traduzidos.`);
           }
           
-          // Semiautomatic save if already in an entry
+          // Semiautomatic save
           if (currentEntryId) {
             storageService.updateEntry(currentEntryId, {
               sourceText: textToTranslate,
               translatedText: finalTranslation,
               translatorNotes: Array.from(new Set(allNotes)),
+              adaptedExpressions: allAdapted,
+              translationStrategy: lastStrategy,
+              toneDetected: lastTone,
               sourceLanguage: settings.sourceLanguage,
               targetLanguage: settings.targetLanguage,
               translationMode: settings.mode,
@@ -249,31 +301,31 @@ export default function App() {
               preserveProperNames: settings.preserveNames,
               showTranslatorNotes: settings.showNotes,
             });
-            setHasUnsavedChanges(false);
           }
         }
       } else {
-        setProgressMessage("Analisando contexto e traduzindo...");
+        // Tradução simples para textos curtos
+        setProgressMessage("Analisando e traduzindo...");
         setTranslationProgress(30);
-        const result = await translateText(
-          textToTranslate, 
-          settings,
-          (msg) => setProgressMessage(msg)
-        );
-        setTranslationProgress(70);
+        const result = await translateText(textToTranslate, settings, (msg) => setProgressMessage(msg));
+        setTranslationProgress(100);
         setTranslatedText(result.translatedText);
         setDetectedLanguage(result.detectedLanguage);
-        if (result.notes) {
-          setNotes(result.notes);
-        }
-        setTranslationProgress(100);
+        if (result.notes) setNotes(result.notes);
+        if (result.adaptedExpressions) setAdaptedExpressions(result.adaptedExpressions);
+        if (result.translationStrategy) setTranslationStrategy(result.translationStrategy);
+        if (result.toneDetected) setToneDetected(result.toneDetected);
+        showToast("Tradução concluída!");
         
-        // Semiautomatic save if already in an entry
+        // Semiautomatic save
         if (currentEntryId) {
           storageService.updateEntry(currentEntryId, {
             sourceText: textToTranslate,
             translatedText: result.translatedText,
             translatorNotes: result.notes || [],
+            adaptedExpressions: result.adaptedExpressions || [],
+            translationStrategy: result.translationStrategy || "",
+            toneDetected: result.toneDetected || "",
             sourceLanguage: settings.sourceLanguage,
             targetLanguage: settings.targetLanguage,
             translationMode: settings.mode,
@@ -282,22 +334,20 @@ export default function App() {
             preserveProperNames: settings.preserveNames,
             showTranslatorNotes: settings.showNotes,
           });
-          setHasUnsavedChanges(false);
         }
       }
       
       setHasUnsavedChanges(true);
-      showToast("Tradução concluída com sucesso!");
     } catch (err: any) {
       console.error("Translation error:", err);
-      setError(err instanceof Error ? err.message : "Não foi possível concluir a tradução agora. Tente novamente.");
+      setError(err instanceof Error ? err.message : "Erro inesperado na tradução.");
       showToast("Falha na tradução.", "error");
     } finally {
       setTimeout(() => {
         setIsTranslating(false);
         setTranslationProgress(0);
         setProgressMessage("");
-      }, 1000);
+      }, 1500);
     }
   };
 
@@ -372,6 +422,9 @@ export default function App() {
       sourceText: originalText,
       translatedText: translatedText,
       translatorNotes: notes,
+      adaptedExpressions: adaptedExpressions,
+      translationStrategy: translationStrategy,
+      toneDetected: toneDetected,
       chatHistory: chatMessages,
       sourceLanguage: settings.sourceLanguage,
       targetLanguage: settings.targetLanguage,
@@ -387,10 +440,23 @@ export default function App() {
     showToast("Tradução salva no projeto.");
   };
 
+  const handleEntryTitleChange = (title: string) => {
+    setEntryTitle(title);
+    setHasUnsavedChanges(true);
+    
+    // Update current entry if it exists
+    if (currentEntryId) {
+      storageService.updateEntry(currentEntryId, { title });
+    }
+  };
   const handleLoadEntry = (entry: TranslationEntry) => {
     setOriginalText(entry.sourceText);
     setTranslatedText(entry.translatedText);
+    setEntryTitle(entry.title);
     setNotes(entry.translatorNotes);
+    setAdaptedExpressions(entry.adaptedExpressions || []);
+    setTranslationStrategy(entry.translationStrategy || "");
+    setToneDetected(entry.toneDetected || "");
     setChatMessages(entry.chatHistory);
     setSettings({
       sourceLanguage: entry.sourceLanguage,
@@ -484,6 +550,9 @@ export default function App() {
             settings={settings}
             onSettingsChange={handleSettingsChange}
             onResetSettings={handleResetSettings}
+            recentEntries={recentEntries}
+            onLoadEntry={handleLoadEntry}
+            onOpenProjects={() => setIsProjectManagerOpen(true)}
             viewPrefs={viewPrefs}
             className={cn(
               "relative w-72 h-full lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] shadow-2xl lg:shadow-none bg-white",
@@ -519,6 +588,7 @@ export default function App() {
                   isTranslating={isTranslating}
                   progressMessage={progressMessage}
                   translationProgress={translationProgress}
+                  translationBlocks={translationBlocks}
                   error={error}
                   onOriginalTextChange={(text) => { setOriginalText(text); setHasUnsavedChanges(true); }}
                   onTranslate={handleTranslate}
@@ -526,9 +596,14 @@ export default function App() {
                   onExampleClick={handleExampleClick}
                   onDocumentProcessed={handleDocumentProcessed}
                   onSave={handleSaveClick}
+                  entryTitle={entryTitle}
+                  onEntryTitleChange={handleEntryTitleChange}
                   onOpenProjects={() => setIsProjectManagerOpen(true)}
                   onOpenExport={(entry, project, allEntries) => handleOpenExport(entry, project, allEntries)}
                   notes={notes}
+                  adaptedExpressions={adaptedExpressions}
+                  translationStrategy={translationStrategy}
+                  toneDetected={toneDetected}
                   showNotes={settings.showNotes}
                   hasUnsavedChanges={hasUnsavedChanges}
                   viewPrefs={viewPrefs}
@@ -537,6 +612,9 @@ export default function App() {
                     sourceText: originalText,
                     translatedText: translatedText,
                     translatorNotes: notes,
+                    adaptedExpressions: adaptedExpressions,
+                    translationStrategy: translationStrategy,
+                    toneDetected: toneDetected,
                     chatHistory: chatMessages,
                     sourceLanguage: settings.sourceLanguage,
                     targetLanguage: settings.targetLanguage,
@@ -633,6 +711,13 @@ export default function App() {
           </div>
         </div>
       )}
+
+      <ProjectManager 
+        isOpen={isProjectManagerOpen}
+        onClose={() => setIsProjectManagerOpen(false)}
+        onLoadEntry={handleLoadEntry}
+        currentEntryId={currentEntryId}
+      />
 
       {isSaveModalOpen && (
         <SaveModal 

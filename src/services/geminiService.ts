@@ -16,6 +16,9 @@ export interface TranslationResult {
   translatedText: string;
   detectedLanguage?: string;
   notes: string[];
+  adaptedExpressions?: { original: string; adapted: string; explanation: string }[];
+  toneDetected?: string;
+  translationStrategy?: string;
 }
 
 /**
@@ -34,8 +37,8 @@ export function validateTranslationInput(text: string): string | null {
 }
 
 /**
- * 2. buildTranslationPrompt(config)
- * Monta o prompt interno completo de tradução.
+ * 2. buildTranslationPrompt(text, settings)
+ * Monta o prompt interno completo de tradução literária contextual.
  */
 export function buildTranslationPrompt(text: string, settings: TranslationSettings): string {
   const {
@@ -50,98 +53,100 @@ export function buildTranslationPrompt(text: string, settings: TranslationSettin
 
   return `
 PAPEL DA IA:
-Você é um tradutor literário especializado em tradução contextual, adaptação cultural controlada e preservação estilística.
-Não realize uma tradução comum palavra por palavra. Interprete o texto profundamente antes de traduzir, respeitando o tom narrativo e a experiência de leitura pretendida pelo autor original.
+Você é um Tradutor Literário Contextual de elite, especialista em adaptação cultural, localização contextual e equivalência estilística.
+Seu princípio fundamental é: "Traduzir intenção, efeito e naturalidade — não apenas palavras."
 
-CONFIGURAÇÕES ATUAIS DO USUÁRIO:
-- Idioma de origem: ${sourceLanguage === "auto" ? "Detectar automaticamente" : sourceLanguage}
-- Idioma de destino: ${targetLanguage}
-- Modo de tradução: ${mode}
-- Tom desejado: ${tone}
-- Adaptação cultural: ${culturalAdaptation}
-- Preservar nomes próprios: ${preserveNames ? "Sim" : "Não"}
-- Exibir notas do tradutor: ${showNotes ? "Sim" : "Não"}
+OBJETIVO:
+Produzir uma tradução que soe como texto literário real, preservando o sentido, o tom emocional, a voz narrativa, a personalidade dos personagens, a atmosfera e o ritmo do texto original.
 
-INSTRUÇÕES DE COMPORTAMENTO:
-- Leia o texto por completo antes de traduzir.
-- Identifique o contexto narrativo (diálogo, narração, descrição, etc.).
-- Preserve a intenção, a atmosfera e a voz do texto.
-- Evite tradução mecânica. Adapte expressões idiomáticas de forma natural.
-- Respeite o nível de adaptação cultural solicitado.
-- Preserve consistência terminológica e estilística.
-- ${preserveNames ? "Preserve nomes de personagens, lugares e organizações, salvo formas consagradas." : "Adapte nomes próprios se necessário para o contexto local."}
-- Produza um texto final que soe natural no idioma de destino.
+CONFIGURAÇÕES DE TRADUÇÃO:
+- Idioma de Origem: ${sourceLanguage === "auto" ? "Detectar automaticamente" : sourceLanguage}
+- Idioma de Destino: ${targetLanguage}
+- Modo de Tradução: ${mode}
+- Tom Desejado: ${tone}
+- Nível de Adaptação Cultural: ${culturalAdaptation}
+- Preservar Nomes Próprios: ${preserveNames ? "Sim" : "Não"}
 
-REGRAS ESPECÍFICAS POR MODO:
-${mode === "Literal" ? `
-- Priorize maior proximidade estrutural com o original.
-- Faça menos reformulações.
-- Adapte apenas quando necessário para compreensão.
-- Preserve construções do original sempre que possível sem comprometer a inteligibilidade.` : ""}
-${mode === "Equilibrado" ? `
-- Equilibre fidelidade e fluidez.
-- Preserve sentido, ritmo e atmosfera.
-- Adapte apenas quando necessário para naturalidade.
-- Evite literalidade excessiva e evite reescrita livre demais.` : ""}
-${mode === "Adaptado" ? `
-- Priorize fluidez e recepção natural no idioma de destino.
-- Reformule quando necessário para manter impacto e legibilidade.
-- Adapte expressões, referências e construções com mais liberdade, sem perder a intenção do original.
-- Preserve a experiência de leitura acima da estrutura literal.` : ""}
+ORDEM DE PRIORIDADE (Siga rigorosamente):
+1. Preservar o sentido real da passagem.
+2. Preservar a intenção comunicativa.
+3. Preservar o tom e a atmosfera.
+4. Preservar a naturalidade na língua de destino.
+5. Preservar o impacto literário.
+6. Preservar a voz narrativa e o registro dos personagens.
+7. Preservar a estrutura textual original (parágrafos, diálogos, quebras).
+8. Preservar marcas culturais quando isso enriquecer o texto.
+9. Adaptar o que soaria artificial ou estranho se traduzido literalmente.
 
-REGRAS ESPECÍFICAS POR TOM:
-${tone === "Neutro" ? "- Usar linguagem clara, estável e natural." : ""}
-${tone === "Poético" ? "- Valorizar musicalidade, imagens e delicadeza expressiva." : ""}
-${tone === "Dramático" ? "- Intensificar levemente a carga emocional quando compatível com o original." : ""}
-${tone === "Sombrio" ? "- Preservar densidade, tensão e atmosfera pesada." : ""}
-${tone === "Clássico" ? "- Preferir formulações mais elegantes e atemporais." : ""}
-${tone === "Moderno" ? "- Favorecer fluidez contemporânea sem banalizar a escrita." : ""}
+ANÁLISE PRÉVIA:
+Antes de traduzir, analise o trecho para identificar:
+- Regionalismos, expressões idiomáticas, gírias e ditados.
+- Metáforas, ironia e linguagem figurada.
+- Estilo narrativo (sombrio, lírico, seco, introspectivo, etc.).
+- Natureza do trecho (narração, diálogo, descrição, reflexão, humor, tensão, poesia).
 
-REGRAS ESPECÍFICAS POR ADAPTAÇÃO CULTURAL:
-${culturalAdaptation === "Baixa" ? `
-- Mantenha referências culturais do original.
-- Adapte somente o necessário para compreensão.` : ""}
-${culturalAdaptation === "Moderada" ? `
-- Adapte quando a leitura literal soar artificial ou opaca.
-- Preserve equilíbrio entre identidade cultural e naturalidade.` : ""}
-${culturalAdaptation === "Alta" ? `
-- Localize expressões e equivalentes culturais com maior liberdade.
-- Preserve a intenção e o efeito do original.
-- Evite exageros ou regionalismos inadequados.` : ""}
+INSTRUÇÕES ESPECÍFICAS:
 
-PROTEÇÕES DE QUALIDADE:
-- Não resuma o texto.
-- Não censure automaticamente elementos literários.
-- Não simplifique excessivamente.
-- Não transforme narração em explicação.
-- Não altere nomes sem motivo.
-- Não omita frases.
-- Não invente conteúdo que não esteja implícito no original.
-- Não adicionar moral, comentário ou interpretação extra.
+1. TRATAMENTO DE EXPRESSÕES E REGIONALISMOS:
+- NÃO traduza literalmente por padrão.
+- Identifique a função e o efeito da expressão.
+- Busque um equivalente natural na língua de destino.
+- Se não houver equivalente perfeito, reescreva de forma fluida mantendo o espírito.
 
-CASOS DE ENTRADA IMPERFEITA:
-- Para trechos incompletos ou frases soltas, preserve a coerência local.
+2. DIÁLOGOS:
+- Priorize a oralidade natural.
+- Preserve a personalidade, idade, nível de formalidade e subtexto.
+
+3. NARRAÇÃO:
+- Preserve a fluidez literária e o ritmo.
+- Evite frases duras ou mecânicas.
+
+4. MODOS DE TRADUÇÃO:
+- Literal: Maior proximidade lexical, menos adaptação, mas sem ser artificial.
+- Equilibrado: Equilíbrio entre fidelidade e naturalidade. Modo padrão.
+- Literário Adaptado: Foco máximo em fluidez, estilo e impacto. Liberdade responsável para adaptar regionalismos e referências.
+
+5. TONS:
+- Neutro: Linguagem clara e estável.
+- Formal: Refinada e controlada.
+- Coloquial: Natural e oral.
+- Poético: Sensibilidade estética e musicalidade.
+- Juvenil: Fluidez contemporânea.
+- Narrativo: Foco em leitura literária fluida.
+
+6. ADAPTAÇÃO CULTURAL:
+- Mínima: Preserva marcas originais, adapta apenas para compreensão básica.
+- Moderada: Equilíbrio entre identidade cultural e naturalidade.
+- Alta: Prioriza equivalência de efeito, localiza expressões com liberdade.
+
+7. PRESERVAÇÃO DE ESTRUTURA:
+- Mantenha RIGOROSAMENTE a divisão de parágrafos, quebras de linha e marcadores de diálogo.
 
 TEXTO PARA TRADUÇÃO:
 """
 ${text}
 """
 
-INSTRUÇÃO DE FORMATO DE SAÍDA:
-Retorne estritamente um objeto JSON com a seguinte estrutura:
+INSTRUÇÃO DE FORMATO DE SAÍDA (JSON):
+Retorne estritamente um objeto JSON com esta estrutura:
 {
   "detected_source_language": "string",
   "translation": "string",
-  "translator_notes": ["string", "string"]
+  "translator_notes": ["string"],
+  "adapted_expressions": [
+    { "original": "string", "adapted": "string", "explanation": "string" }
+  ],
+  "tone_detected": "string",
+  "translation_strategy": "string"
 }
 
 REGRAS DE SAÍDA:
-- detected_source_language = idioma detectado ou idioma informado.
-- translation = texto traduzido completo. NÃO retorne uma string vazia para a tradução.
-- translator_notes = array vazio se notas estiverem desativadas ou se não houver observações relevantes.
-- Não repita o texto original.
-- Não faça introduções ou comentários fora do JSON.
-- Certifique-se de que o JSON seja válido e bem formado.
+- "translation": O texto traduzido completo.
+- "translator_notes": Notas curtas e elegantes sobre escolhas difíceis (apenas se showNotes for true).
+- "adapted_expressions": Lista de expressões idiomáticas ou regionais que foram adaptadas.
+- "tone_detected": O tom que você identificou no original.
+- "translation_strategy": Breve descrição da estratégia adotada para este trecho.
+- Não inclua texto fora do JSON.
 `.trim();
 }
 
@@ -221,7 +226,10 @@ export function parseTranslationResponse(rawResponse: string): TranslationResult
       translatedText: translation,
       detectedLanguage: parsed.detected_source_language || parsed.language || "Não identificado",
       notes: Array.isArray(parsed.translator_notes) ? parsed.translator_notes : 
-             Array.isArray(parsed.notes) ? parsed.notes : []
+             Array.isArray(parsed.notes) ? parsed.notes : [],
+      adaptedExpressions: Array.isArray(parsed.adapted_expressions) ? parsed.adapted_expressions : [],
+      toneDetected: parsed.tone_detected || "",
+      translationStrategy: parsed.translation_strategy || ""
     };
   } catch (error) {
     console.error("Erro ao interpretar resposta:", error, rawResponse);
@@ -234,6 +242,9 @@ export function parseTranslationResponse(rawResponse: string): TranslationResult
       .replace(/\{"translation":/g, "")
       .replace(/"detected_source_language":.*?,/g, "")
       .replace(/"translator_notes":.*?\]/g, "")
+      .replace(/"adapted_expressions":.*?\]/g, "")
+      .replace(/"tone_detected":.*?,/g, "")
+      .replace(/"translation_strategy":.*?,/g, "")
       .replace(/\}/g, "")
       .trim();
 
@@ -241,12 +252,47 @@ export function parseTranslationResponse(rawResponse: string): TranslationResult
       return {
         translatedText: fallbackText,
         detectedLanguage: "Não identificado",
-        notes: ["Nota: A resposta do modelo não estava em formato JSON perfeito, mas o texto foi recuperado."]
+        notes: ["Nota: A resposta do modelo não estava em formato JSON perfeito, mas o texto foi recuperado."],
+        adaptedExpressions: [],
+        toneDetected: "Desconhecido",
+        translationStrategy: "Recuperação de emergência"
       };
     }
     
     throw new Error("Recebemos uma resposta malformada do modelo que não pôde ser recuperada.");
   }
+}
+
+/**
+ * translateTextFallback(text, settings)
+ * Versão simplificada da tradução para casos de falha persistente.
+ * Foca em estabilidade e retorno direto.
+ */
+export async function translateTextFallback(
+  text: string,
+  settings: TranslationSettings
+): Promise<TranslationResult> {
+  const prompt = `Traduza o seguinte texto literário de ${settings.sourceLanguage} para ${settings.targetLanguage}.
+Mantenha o tom ${settings.tone} e o modo ${settings.mode}.
+PRESERVE A FORMATAÇÃO ORIGINAL (parágrafos e quebras de linha).
+
+TEXTO:
+"""
+${text}
+"""
+
+Retorne APENAS o JSON:
+{
+  "translation": "texto traduzido aqui",
+  "detected_source_language": "idioma",
+  "translator_notes": [],
+  "adapted_expressions": [],
+  "tone_detected": "",
+  "translation_strategy": "fallback"
+}`;
+
+  const rawResponse = await callTranslationModel(prompt, 1);
+  return parseTranslationResponse(rawResponse);
 }
 
 /**
@@ -267,16 +313,16 @@ export async function translateText(
   const prompt = buildTranslationPrompt(text, settings);
 
   // 3. Chamar modelo (com mensagens de progresso)
-  onProgress?.("Lendo o contexto narrativo...");
+  onProgress?.("Analisando sentido, tom e intenção...");
   await new Promise(r => setTimeout(r, 800));
   
-  onProgress?.("Identificando tom, estilo e nuances culturais...");
+  onProgress?.("Interpretando atmosfera e nuances culturais...");
   const rawResponse = await callTranslationModel(prompt);
   
-  onProgress?.("Ajustando a tradução para maior naturalidade literária...");
+  onProgress?.("Refinando voz narrativa e naturalidade...");
   await new Promise(r => setTimeout(r, 600));
   
-  onProgress?.("Finalizando a versão traduzida...");
+  onProgress?.("Finalizando tradução literária...");
   
   // 4. Interpretar resposta
   return parseTranslationResponse(rawResponse);
