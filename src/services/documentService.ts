@@ -81,10 +81,14 @@ export const normalizeExtractedText = (text: string): string => {
   if (!text) return "";
 
   return text
-    // Remove espaços horizontais duplicados, mas mantém quebras
+    // Normaliza espaços horizontais
     .replace(/[ \t]+/g, ' ')
-    // Normaliza quebras de linha excessivas (mais de 2 vira parágrafo duplo)
-    .replace(/\n{3,}/g, '\n\n')
+    // Preserva até 5 quebras de linha (comum em literatura para transições fortes)
+    .replace(/\n{6,}/g, '\n\n\n\n\n')
+    // Remove espaços no final de cada linha mas mantém as quebras
+    .split('\n')
+    .map(line => line.trimEnd())
+    .join('\n')
     .trim();
 };
 
@@ -382,6 +386,9 @@ export interface TranslationScope {
 export interface DocumentChunk {
   id: string;
   text: string;
+  suffix: string; // Sequência de whitespace/quebras que separa este chunk do próximo
+  originalLength: number;
+  paragraphCount: number;
   index: number;
   total: number;
   status: 'pending' | 'translating' | 'success' | 'retrying' | 'failed';
@@ -426,15 +433,17 @@ export const getDocumentTranslationScopeText = (
  * Prioriza manter a estrutura literária intacta.
  */
 export const splitLargeDocumentIntoChunks = (text: string, chunkSize: number = 5000): DocumentChunk[] => {
-  if (!text || !text.trim()) return [];
+  if (!text) return [];
 
-  // Limpeza inicial: remove espaços em branco no início/fim, mas preserva quebras internas
-  const sourceText = text.trim();
+  const sourceText = text;
 
   if (sourceText.length <= chunkSize) {
     return [{ 
       id: crypto.randomUUID(), 
       text: sourceText, 
+      suffix: "",
+      originalLength: sourceText.length,
+      paragraphCount: (sourceText.match(/\n/g) || []).length + 1,
       index: 0, 
       total: 1,
       status: 'pending',
@@ -447,11 +456,13 @@ export const splitLargeDocumentIntoChunks = (text: string, chunkSize: number = 5
   let currentIndex = 0;
 
   while (remainingText.length > 0) {
-    // Se o que sobrou cabe num bloco, adiciona e encerra
     if (remainingText.length <= chunkSize) {
       chunks.push({ 
         id: crypto.randomUUID(), 
         text: remainingText, 
+        suffix: "",
+        originalLength: remainingText.length,
+        paragraphCount: (remainingText.match(/\n/g) || []).length + 1,
         index: currentIndex, 
         total: 0,
         status: 'pending',
@@ -460,54 +471,45 @@ export const splitLargeDocumentIntoChunks = (text: string, chunkSize: number = 5
       break;
     }
 
-    // Estratégia de corte inteligente:
-    // 1. Tenta cortar em parágrafo duplo (\n\n) - ideal para manter blocos narrativos
     let splitIndex = remainingText.lastIndexOf('\n\n', chunkSize);
-    
-    // 2. Se não achou parágrafo duplo ou o corte ficou muito pequeno (menos de 40% do chunk), 
-    // tenta quebra de linha simples (\n) - bom para diálogos
     if (splitIndex === -1 || splitIndex < chunkSize * 0.4) {
       splitIndex = remainingText.lastIndexOf('\n', chunkSize);
     }
-
-    // 3. Se ainda não achou ou corte pequeno, tenta fim de frase (. )
     if (splitIndex === -1 || splitIndex < chunkSize * 0.4) {
       const lastDot = remainingText.lastIndexOf('. ', chunkSize);
       const lastExcl = remainingText.lastIndexOf('! ', chunkSize);
       const lastQuest = remainingText.lastIndexOf('? ', chunkSize);
       splitIndex = Math.max(lastDot, lastExcl, lastQuest);
-      if (splitIndex !== -1) splitIndex += 1; // Inclui o ponto
+      if (splitIndex !== -1) splitIndex += 1;
     }
-
-    // 4. Se ainda nada, tenta espaço simples
     if (splitIndex === -1 || splitIndex < chunkSize * 0.4) {
       splitIndex = remainingText.lastIndexOf(' ', chunkSize);
     }
-
-    // 5. Fallback absoluto: corta no limite exato (raro em textos literários)
     if (splitIndex === -1) {
       splitIndex = chunkSize;
     }
 
-    const chunkText = remainingText.substring(0, splitIndex).trim();
+    // Encontra a sequência de whitespace/newlines que segue o trecho
+    const textBefore = remainingText.substring(0, splitIndex);
+    const match = remainingText.substring(splitIndex).match(/^[\s\n]+/);
+    const suffix = match ? match[0] : "";
     
-    // Validação: ignora blocos vazios ou apenas com espaços
-    if (chunkText.length > 0) {
-      chunks.push({ 
-        id: crypto.randomUUID(), 
-        text: chunkText, 
-        index: currentIndex, 
-        total: 0,
-        status: 'pending',
-        attempts: 0
-      });
-      currentIndex++;
-    }
+    chunks.push({ 
+      id: crypto.randomUUID(), 
+      text: textBefore, 
+      suffix: suffix,
+      originalLength: textBefore.length,
+      paragraphCount: (textBefore.match(/\n/g) || []).length + 1,
+      index: currentIndex, 
+      total: 0,
+      status: 'pending',
+      attempts: 0
+    });
     
-    remainingText = remainingText.substring(splitIndex).trim();
+    currentIndex++;
+    remainingText = remainingText.substring(splitIndex + suffix.length);
   }
 
-  // Atualiza o total em todos os blocos
   const total = chunks.length;
   return chunks.map(c => ({ ...c, total }));
 };

@@ -193,7 +193,7 @@ export default function App() {
     
     try {
       // Se o texto for muito grande, divide em blocos
-      const CHUNK_SIZE = 5000;
+      const CHUNK_SIZE = 4000;
       if (textToTranslate.length > CHUNK_SIZE) {
         const chunks = splitLargeDocumentIntoChunks(textToTranslate, CHUNK_SIZE);
         setTranslationBlocks(chunks);
@@ -224,15 +224,28 @@ export default function App() {
               const currentStatus = retryCount > 0 ? 'retrying' : 'translating';
               setTranslationBlocks(prev => prev.map((c, idx) => idx === i ? { ...c, status: currentStatus, attempts: retryCount } : c));
 
-              // Na última tentativa, usa o fallback
+              // Na última tentativa, usa o fallback, nas outras tenta refinar
               const result = retryCount === maxRetries 
                 ? await translateTextFallback(chunk.text, settings)
                 : await translateText(
                     chunk.text, 
                     settings, 
-                    (msg) => setProgressMessage(`Bloco ${i + 1}${retryCount > 0 ? ` (Tentativa ${retryCount + 1})` : ""}: ${msg}`)
+                    (msg) => setProgressMessage(`Bloco ${i + 1}${retryCount > 0 ? ` (Tentativa ${retryCount + 1})` : ""}: ${msg}`),
+                    retryCount > 0 // Força estrutura se for um retry
                   );
               
+              // Validação rigorosa de preservação estrutural
+              const originalParagraphs = chunk.paragraphCount;
+              const translatedParagraphs = result.translatedText.split('\n').filter(p => p.trim() !== "").length;
+              const originalCount = chunk.text.split('\n').filter(p => p.trim() !== "").length;
+              
+              // Se a tradução fundiu parágrafos, tenta novamente com instrução reforçada
+              if (originalCount > 1 && translatedParagraphs < originalCount && retryCount < maxRetries) {
+                console.warn(`Bloco ${i + 1}: Fusão de parágrafos detectada (${translatedParagraphs}/${originalCount}). Tentando correção estrutural...`);
+                retryCount++;
+                continue;
+              }
+
               finalTranslatedChunks[i] = result.translatedText;
               if (result.notes) allNotes.push(...result.notes);
               if (result.adaptedExpressions) allAdapted.push(...result.adaptedExpressions);
@@ -263,12 +276,17 @@ export default function App() {
           }
           
           // Atualiza o texto traduzido parcial para o usuário ver progresso real
-          setTranslatedText(finalTranslatedChunks.filter(t => t !== "").join("\n\n"));
+          setTranslatedText(finalTranslatedChunks.map((t, idx) => {
+            if (t === "") return "";
+            return t + (chunks[idx]?.suffix || "");
+          }).join(""));
         }
 
         const successfulChunks = finalTranslatedChunks.filter(t => t !== "");
         if (successfulChunks.length > 0) {
-          const finalTranslation = finalTranslatedChunks.join("\n\n").trim();
+          const finalTranslation = finalTranslatedChunks.map((t, idx) => {
+            return t + (chunks[idx]?.suffix || "");
+          }).join("");
           setTranslatedText(finalTranslation);
           setNotes(Array.from(new Set(allNotes)));
           setAdaptedExpressions(allAdapted);
@@ -307,7 +325,20 @@ export default function App() {
         // Tradução simples para textos curtos
         setProgressMessage("Analisando e traduzindo...");
         setTranslationProgress(30);
-        const result = await translateText(textToTranslate, settings, (msg) => setProgressMessage(msg));
+        
+        let result = await translateText(textToTranslate, settings, (msg) => setProgressMessage(msg));
+        
+        // Validação estrutural básica para textos curtos
+        const originalLines = textToTranslate.split('\n').filter(p => p.trim() !== "");
+        const originalCount = originalLines.length;
+        const translatedCount = result.translatedText.split('\n').filter(p => p.trim() !== "").length;
+        
+        if (originalCount > 1 && translatedCount < originalCount) {
+          console.warn("Fusão de parágrafos detectada em texto curto. Tentando correção...");
+          setProgressMessage("Refinando estrutura literária...");
+          result = await translateText(textToTranslate, settings, undefined, true);
+        }
+
         setTranslationProgress(100);
         setTranslatedText(result.translatedText);
         setDetectedLanguage(result.detectedLanguage);

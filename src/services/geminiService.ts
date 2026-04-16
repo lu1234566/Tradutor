@@ -53,11 +53,11 @@ export function buildTranslationPrompt(text: string, settings: TranslationSettin
 
   return `
 PAPEL DA IA:
-Você é um Tradutor Literário Contextual de elite, especialista em adaptação cultural, localização contextual e equivalência estilística.
-Seu princípio fundamental é: "Traduzir intenção, efeito e naturalidade — não apenas palavras."
+Você é um Tradutor Literário de Elite e Revisor Editorial Sênior, especializado em ficção de suspense contemporânea para o mercado brasileiro.
+Seu princípio fundamental é: "A tradução não deve parecer uma tradução, mas sim prosa literária original, tensa e fluida, escrita nativamente em Português Brasileiro."
 
 OBJETIVO:
-Produzir uma tradução que soe como texto literário real, preservando o sentido, o tom emocional, a voz narrativa, a personalidade dos personagens, a atmosfera e o ritmo do texto original.
+Produzir uma tradução de altíssima qualidade literária que preserve a alma, o subtexto e o ritmo do original, eliminando qualquer rastro de "texto processado" ou escolhas mecânicas.
 
 CONFIGURAÇÕES DE TRADUÇÃO:
 - Idioma de Origem: ${sourceLanguage === "auto" ? "Detectar automaticamente" : sourceLanguage}
@@ -68,59 +68,24 @@ CONFIGURAÇÕES DE TRADUÇÃO:
 - Preservar Nomes Próprios: ${preserveNames ? "Sim" : "Não"}
 
 ORDEM DE PRIORIDADE (Siga rigorosamente):
-1. Preservar o sentido real da passagem.
-2. Preservar a intenção comunicativa.
-3. Preservar o tom e a atmosfera.
-4. Preservar a naturalidade na língua de destino.
-5. Preservar o impacto literário.
-6. Preservar a voz narrativa e o registro dos personagens.
-7. Preservar a estrutura textual original (parágrafos, diálogos, quebras).
-8. Preservar marcas culturais quando isso enriquecer o texto.
-9. Adaptar o que soaria artificial ou estranho se traduzido literalmente.
+1. PRESERVAÇÃO ARQUITETÔNICA: Mantenha rigorosamente parágrafos curtos e frases de impacto isoladas.
+2. NATURALIDADE LITERÁRIA (PT-BR): O texto deve soar como suspense contemporâneo brasileiro (inteligente, direto, tenso, fluido).
+3. VOZ NARRATIVA: Mantenha a coerência tonal da narradora (observadora, tensa, ocasionalmente irônica).
+4. PRECISÃO LEXICAL: Evite calques do inglês e escolhas que soem artificiais ou involuntariamente cômicas.
+5. RITMO E TIMING: Preserve a cadência e a respiração do texto original.
 
-ANÁLISE PRÉVIA:
-Antes de traduzir, analise o trecho para identificar:
-- Regionalismos, expressões idiomáticas, gírias e ditados.
-- Metáforas, ironia e linguagem figurada.
-- Estilo narrativo (sombrio, lírico, seco, introspectivo, etc.).
-- Natureza do trecho (narração, diálogo, descrição, reflexão, humor, tensão, poesia).
+REGRAS DE OURO:
+- EVITE O CÔMICO INVOLUNTÁRIO: Se uma escolha lexical soar estranha ou grotesca fora de propósito (ex: "suco de cadáver"), substitua por algo natural e imersivo.
+- DESCRIÇÕES NATURAIS: Descrições de corpo, rosto e barba devem usar expressões idiomáticas brasileiras (ex: "barba por fazer" em vez de "rosto por fazer"; "suor frio" em vez de "transpiração gélida" se for mais natural).
+- DIÁLOGOS VIVOS: Diálogos devem soar como fala real, com oralidade natural e espontaneidade.
+- NUANCE EXATA: Diferencie pavor de susto, ou espanto de horror. Escolha o termo com a carga emocional precisa.
+- SEM SOLENIDADE EXCESSIVA: A narradora é humana e tensa, não uma acadêmica empolada. Evite elevação desnecessária.
 
-INSTRUÇÕES ESPECÍFICAS:
-
-1. TRATAMENTO DE EXPRESSÕES E REGIONALISMOS:
-- NÃO traduza literalmente por padrão.
-- Identifique a função e o efeito da expressão.
-- Busque um equivalente natural na língua de destino.
-- Se não houver equivalente perfeito, reescreva de forma fluida mantendo o espírito.
-
-2. DIÁLOGOS:
-- Priorize a oralidade natural.
-- Preserve a personalidade, idade, nível de formalidade e subtexto.
-
-3. NARRAÇÃO:
-- Preserve a fluidez literária e o ritmo.
-- Evite frases duras ou mecânicas.
-
-4. MODOS DE TRADUÇÃO:
-- Literal: Maior proximidade lexical, menos adaptação, mas sem ser artificial.
-- Equilibrado: Equilíbrio entre fidelidade e naturalidade. Modo padrão.
-- Literário Adaptado: Foco máximo em fluidez, estilo e impacto. Liberdade responsável para adaptar regionalismos e referências.
-
-5. TONS:
-- Neutro: Linguagem clara e estável.
-- Formal: Refinada e controlada.
-- Coloquial: Natural e oral.
-- Poético: Sensibilidade estética e musicalidade.
-- Juvenil: Fluidez contemporânea.
-- Narrativo: Foco em leitura literária fluida.
-
-6. ADAPTAÇÃO CULTURAL:
-- Mínima: Preserva marcas originais, adapta apenas para compreensão básica.
-- Moderada: Equilíbrio entre identidade cultural e naturalidade.
-- Alta: Prioriza equivalência de efeito, localiza expressões com liberdade.
-
-7. PRESERVAÇÃO DE ESTRUTURA:
-- Mantenha RIGOROSAMENTE a divisão de parágrafos, quebras de linha e marcadores de diálogo.
+REVISÃO EDITORIAL FINAL (FILTRO SILENCIOSO):
+Antes de finalizar a resposta, revise mentalmente:
+- "Isso soa como português literário natural?"
+- "Essa palavra chama atenção por ser esquisita ou por ser precisa?"
+- "A tensão foi preservada sem soar melodramática ou técnica demais?"
 
 TEXTO PARA TRADUÇÃO:
 """
@@ -128,7 +93,7 @@ ${text}
 """
 
 INSTRUÇÃO DE FORMATO DE SAÍDA (JSON):
-Retorne estritamente um objeto JSON com esta estrutura:
+Retorne estritamente um objeto JSON com esta estrutura. No campo "translation", use \\n para representar quebras de linha.
 {
   "detected_source_language": "string",
   "translation": "string",
@@ -142,7 +107,7 @@ Retorne estritamente um objeto JSON com esta estrutura:
 
 REGRAS DE SAÍDA:
 - "translation": O texto traduzido completo.
-- "translator_notes": Notas curtas e elegantes sobre escolhas difíceis (apenas se showNotes for true).
+- "translator_notes": Notas curtas e elegantes sobre escolhas difíceis (apenas se showNotes for true). Garanta que a nota seja coerente com o texto final entregue.
 - "adapted_expressions": Lista de expressões idiomáticas ou regionais que foram adaptadas.
 - "tone_detected": O tom que você identificou no original.
 - "translation_strategy": Breve descrição da estratégia adotada para este trecho.
@@ -168,7 +133,7 @@ export async function callTranslationModel(prompt: string, retries: number = 2):
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
-          systemInstruction: "Você é um tradutor literário de elite. Responda sempre em JSON conforme solicitado. Se o texto for complexo, mantenha a integridade literária.",
+          systemInstruction: "Você é um Tradutor Literário de Elite e Revisor Editorial Sênior. Sua prioridade é a precisão lexical e a naturalidade absoluta do Português Brasileiro contemporâneo. Garanta que a arquitetura textual original seja preservada, mas priorize que o texto soe como prosa literária nativa, tensa e fluida. Responda sempre em JSON.",
           responseMimeType: "application/json",
         },
       });
@@ -222,8 +187,14 @@ export function parseTranslationResponse(rawResponse: string): TranslationResult
       throw new Error("Conteúdo de tradução ausente ou inválido no JSON.");
     }
 
+    // Limpeza final de ortografia comum em títulos e normalização de quebras
+    const finalTranslation = translation
+      .replace(/PROLÓGO/g, "PRÓLOGO")
+      .replace(/Prológo/g, "Prólogo")
+      .replace(/prológo/g, "prólogo");
+
     return {
-      translatedText: translation,
+      translatedText: finalTranslation,
       detectedLanguage: parsed.detected_source_language || parsed.language || "Não identificado",
       notes: Array.isArray(parsed.translator_notes) ? parsed.translator_notes : 
              Array.isArray(parsed.notes) ? parsed.notes : [],
@@ -301,7 +272,8 @@ Retorne APENAS o JSON:
 export async function translateText(
   text: string,
   settings: TranslationSettings,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
+  forceStructure: boolean = false
 ): Promise<TranslationResult> {
   // 1. Validar entrada
   const validationError = validateTranslationInput(text);
@@ -310,7 +282,11 @@ export async function translateText(
   }
 
   // 2. Montar prompt
-  const prompt = buildTranslationPrompt(text, settings);
+  let prompt = buildTranslationPrompt(text, settings);
+  
+  if (forceStructure) {
+    prompt += "\n\nAVISO DE REVISÃO ESTRUTURAL: O bloco anterior foi rejeitado por fusão de parágrafos. NESTE BLOCO, é MANDATÁRIO manter exatamente a mesma quantidade de quebras de linha e parágrafos do original. NÃO UNA LINHAS INDEPENDENTES.";
+  }
 
   // 3. Chamar modelo (com mensagens de progresso)
   onProgress?.("Analisando sentido, tom e intenção...");

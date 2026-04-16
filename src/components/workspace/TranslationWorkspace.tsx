@@ -27,6 +27,7 @@ import {
 import { countCharacters, countWords, cn } from "@/src/utils";
 import { DocumentUpload } from "./DocumentUpload";
 import { DocumentTranslationConfig } from "./DocumentTranslationConfig";
+import { ResultViewer } from "./ResultViewer";
 import { TranslatorNotes } from "./TranslatorNotes";
 import { 
   DocumentMetadata, 
@@ -392,33 +393,17 @@ export const TranslationWorkspace: React.FC<TranslationWorkspaceProps> = ({
             "relative group rounded-[2.5rem] border border-slate-100 bg-white shadow-soft transition-all duration-500 hover:shadow-premium hover:border-brand-100 overflow-hidden",
             densityClasses.card
           )}>
-            <TextArea
-              placeholder="Sua tradução aparecerá aqui..."
-              value={translatedText}
-              readOnly
+            <ResultViewer
+              content={translatedText}
+              isTranslating={isTranslating}
+              viewPrefs={viewPrefs}
               className={cn(
-                "border-none shadow-none min-h-[300px] lg:min-h-[400px] bg-transparent",
-                densityClasses.text,
-                isTranslating && "animate-pulse text-slate-300"
+                "bg-transparent",
+                densityClasses.text
               )}
             />
             
-            {/* Empty State for Output */}
-            {!translatedText && !isTranslating && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center gap-6 paper-texture">
-                <div className="h-20 w-20 bg-slate-50 rounded-[2rem] flex items-center justify-center text-slate-200 shadow-soft border border-slate-100">
-                  <BookOpen className="h-10 w-10" />
-                </div>
-                <div className="max-w-xs space-y-2">
-                  <p className="text-sm font-semibold text-slate-500 leading-relaxed">
-                    Pronto para a metamorfose literária.
-                  </p>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Clique em <span className="text-brand-700 font-bold">Traduzir</span> para iniciar a análise contextual.
-                  </p>
-                </div>
-              </div>
-            )}
+
             
             {translatedText && !isTranslating && (
               <div className="absolute bottom-8 right-8 flex gap-2">
