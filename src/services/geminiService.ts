@@ -21,6 +21,52 @@ export interface TranslationResult {
   translationStrategy?: string;
 }
 
+const LEXICAL_GUARDRAILS = [
+  { pattern: /\bsuco de cadáver\b/gi, replacement: "fluidos de cadáver" },
+  { pattern: /\bcaldo de cadáver\b/gi, replacement: "fluidos de cadáver" },
+  { pattern: /\brosto por fazer\b/gi, replacement: "rosto mal barbeado" },
+  { pattern: /\bexpressão no rosto mal barbeado completamente vazia\b/gi, replacement: "expressão completamente vazia no rosto mal barbeado" },
+  { pattern: /\bfico em choque\b/gi, replacement: "fico impressionada" },
+  { pattern: /^É divino\.$/gim, replacement: "É perfeito." },
+  { pattern: /\buma gota salgada escorre\b/gi, replacement: "uma gota de suor escorre" },
+];
+
+function normalizeNotes(
+  notes: string[],
+  settings?: TranslationSettings
+): string[] {
+  const cleaned = notes
+    .map((note) => note.trim())
+    .filter(Boolean)
+    .filter((note) => !/suco de cadáver|caldo de cadáver|rosto por fazer/i.test(note));
+
+  if (!settings?.showNotes) {
+    return [];
+  }
+
+  return Array.from(new Set(cleaned));
+}
+
+function normalizeTranslationText(text: string): string {
+  let normalized = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\u00A0/g, " ")
+    .replace(/PROLÓGO/g, "PRÓLOGO")
+    .replace(/Prológo/g, "Prólogo")
+    .replace(/prológo/g, "prólogo");
+
+  for (const rule of LEXICAL_GUARDRAILS) {
+    normalized = normalized.replace(rule.pattern, rule.replacement);
+  }
+
+  normalized = normalized
+    .replace(/([.!?…])([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇ—])/g, "$1\n$2")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return normalized;
+}
+
 /**
  * 1. validateTranslationInput(text)
  * Valida a entrada do usuário antes de iniciar a tradução.
@@ -51,6 +97,10 @@ export function buildTranslationPrompt(text: string, settings: TranslationSettin
     showNotes
   } = settings;
 
+  const notesInstruction = showNotes
+    ? `- "translator_notes": No máximo 4 notas curtas, elegantes e realmente úteis. Não invente justificativas para escolhas fracas.`
+    : `- "translator_notes": Retorne um array vazio.`;
+
   return `
 PAPEL DA IA:
 Você é um Tradutor Literário de Elite e Revisor Editorial Sênior, especializado em ficção de suspense contemporânea para o mercado brasileiro.
@@ -68,24 +118,33 @@ CONFIGURAÇÕES DE TRADUÇÃO:
 - Preservar Nomes Próprios: ${preserveNames ? "Sim" : "Não"}
 
 ORDEM DE PRIORIDADE (Siga rigorosamente):
-1. PRESERVAÇÃO ARQUITETÔNICA: Mantenha rigorosamente parágrafos curtos e frases de impacto isoladas.
+1. PRESERVAÇÃO ARQUITETÔNICA: Mantenha rigorosamente parágrafos curtos, frases de impacto isoladas, diálogos e pausas narrativas.
 2. NATURALIDADE LITERÁRIA (PT-BR): O texto deve soar como suspense contemporâneo brasileiro (inteligente, direto, tenso, fluido).
 3. VOZ NARRATIVA: Mantenha a coerência tonal da narradora (observadora, tensa, ocasionalmente irônica).
-4. PRECISÃO LEXICAL: Evite calques do inglês e escolhas que soem artificiais ou involuntariamente cômicas.
-5. RITMO E TIMING: Preserve a cadência e a respiração do texto original.
+4. PRECISÃO LEXICAL: Evite calques do inglês e escolhas que soem artificiais, vagas ou involuntariamente cômicas.
+5. RITMO E TIMING: Preserve a cadência, a respiração e os microparágrafos do texto original.
 
 REGRAS DE OURO:
-- EVITE O CÔMICO INVOLUNTÁRIO: Se uma escolha lexical soar estranha ou grotesca fora de propósito (ex: "suco de cadáver"), substitua por algo natural e imersivo.
-- DESCRIÇÕES NATURAIS: Descrições de corpo, rosto e barba devem usar expressões idiomáticas brasileiras (ex: "barba por fazer" em vez de "rosto por fazer"; "suor frio" em vez de "transpiração gélida" se for mais natural).
-- DIÁLOGOS VIVOS: Diálogos devem soar como fala real, com oralidade natural e espontaneidade.
-- NUANCE EXATA: Diferencie pavor de susto, ou espanto de horror. Escolha o termo com a carga emocional precisa.
-- SEM SOLENIDADE EXCESSIVA: A narradora é humana e tensa, não uma acadêmica empolada. Evite elevação desnecessária.
+- EVITE O CÔMICO INVOLUNTÁRIO: nunca use soluções como "suco de cadáver" ou "caldo de cadáver" em narrativa séria; prefira "fluidos de cadáver" ou outra opção natural.
+- DESCRIÇÕES NATURAIS: use expressões idiomáticas brasileiras em descrições físicas. Prefira "rosto mal barbeado" ou "barba por fazer" a "rosto por fazer".
+- NUANCE EXATA: diferencie espanto de horror. Para "I’m always in awe", prefira soluções como "fico impressionada" ou "fico pasma", não "fico em choque", salvo se o contexto realmente exigir choque.
+- REGISTRO NATURAL: se a voz interna estiver íntima e direta, prefira "É perfeito." ou "É um alívio." a soluções excessivamente elevadas como "É divino.", a menos que o próprio original peça solenidade.
+- AMBIGUIDADE CONTROLADA: quando o original for ambíguo, preserve a ambiguidade sem criar expressões estranhas. Exemplo: evite "uma gota salgada"; prefira uma solução clara e natural se o contexto permitir.
+- DIÁLOGOS VIVOS: diálogos devem soar como fala real, com oralidade natural e espontaneidade.
+- SEM SOLENIDADE EXCESSIVA: a narradora é humana e tensa, não empolada. Evite elevação desnecessária.
+
+EXEMPLOS DE BOAS ESCOLHAS:
+- "cadaver juice" -> "fluidos de cadáver"
+- "the expression on his unshaven face" -> "a expressão em seu rosto mal barbeado"
+- "It’s heavenly." -> "É perfeito." / "É um alívio." (conforme a voz)
+- "I’m always in awe." -> "sempre fico impressionada." / "sempre fico pasma."
 
 REVISÃO EDITORIAL FINAL (FILTRO SILENCIOSO):
 Antes de finalizar a resposta, revise mentalmente:
 - "Isso soa como português literário natural?"
 - "Essa palavra chama atenção por ser esquisita ou por ser precisa?"
 - "A tensão foi preservada sem soar melodramática ou técnica demais?"
+- "As notas do tradutor estão coerentes com o texto final?"
 
 TEXTO PARA TRADUÇÃO:
 """
@@ -107,10 +166,10 @@ Retorne estritamente um objeto JSON com esta estrutura. No campo "translation", 
 
 REGRAS DE SAÍDA:
 - "translation": O texto traduzido completo.
-- "translator_notes": Notas curtas e elegantes sobre escolhas difíceis (apenas se showNotes for true). Garanta que a nota seja coerente com o texto final entregue.
-- "adapted_expressions": Lista de expressões idiomáticas ou regionais que foram adaptadas.
-- "tone_detected": O tom que você identificou no original.
-- "translation_strategy": Breve descrição da estratégia adotada para este trecho.
+${notesInstruction}
+- "adapted_expressions": Liste apenas adaptações reais.
+- "tone_detected": O tom identificado no original.
+- "translation_strategy": Breve descrição da estratégia adotada.
 - Não inclua texto fora do JSON.
 `.trim();
 }
@@ -133,13 +192,12 @@ export async function callTranslationModel(prompt: string, retries: number = 2):
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
-          systemInstruction: "Você é um Tradutor Literário de Elite e Revisor Editorial Sênior. Sua prioridade é a precisão lexical e a naturalidade absoluta do Português Brasileiro contemporâneo. Garanta que a arquitetura textual original seja preservada, mas priorize que o texto soe como prosa literária nativa, tensa e fluida. Responda sempre em JSON.",
+          systemInstruction: "Você é um Tradutor Literário de Elite e Revisor Editorial Sênior. Sua prioridade é a precisão lexical, a naturalidade absoluta do Português Brasileiro contemporâneo e a manutenção dos microparágrafos de suspense. Elimine escolhas estranhas ou involuntariamente cômicas. Responda sempre em JSON.",
           responseMimeType: "application/json",
         },
       });
 
       if (!response.text) {
-        // Se não houver texto, pode ser um problema de segurança ou limite
         console.warn(`Tentativa ${i + 1}: Resposta vazia do modelo.`);
         continue;
       }
@@ -148,8 +206,7 @@ export async function callTranslationModel(prompt: string, retries: number = 2):
     } catch (error: any) {
       lastError = error;
       console.error(`Erro na tentativa ${i + 1} de chamada ao modelo:`, error);
-      
-      // Se for um erro de quota ou sobrecarga, espera um pouco antes de tentar novamente
+
       if (error.message?.includes("429") || error.message?.includes("503")) {
         await new Promise(r => setTimeout(r, 1000 * (i + 1)));
       } else if (i < retries) {
@@ -169,67 +226,65 @@ export async function callTranslationModel(prompt: string, retries: number = 2):
  * 4. parseTranslationResponse(rawResponse)
  * Extrai a estrutura da resposta do modelo com fallbacks robustos.
  */
-export function parseTranslationResponse(rawResponse: string): TranslationResult {
+export function parseTranslationResponse(
+  rawResponse: string,
+  settings?: TranslationSettings
+): TranslationResult {
   try {
-    // Limpeza básica para remover possíveis caracteres invisíveis ou lixo
     const cleanResponse = rawResponse.trim();
-    
-    // Tenta extrair o JSON se houver texto extra (Markdown code blocks)
     const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
     const jsonString = jsonMatch ? jsonMatch[0] : cleanResponse;
-    
-    const parsed = JSON.parse(jsonString);
 
-    // Validação mais flexível dos campos
+    const parsed = JSON.parse(jsonString);
     const translation = parsed.translation || parsed.translatedText || parsed.text;
-    
+
     if (!translation || typeof translation !== "string" || translation.length < 2) {
       throw new Error("Conteúdo de tradução ausente ou inválido no JSON.");
     }
 
-    // Limpeza final de ortografia comum em títulos e normalização de quebras
-    const finalTranslation = translation
-      .replace(/PROLÓGO/g, "PRÓLOGO")
-      .replace(/Prológo/g, "Prólogo")
-      .replace(/prológo/g, "prólogo");
+    const finalTranslation = normalizeTranslationText(translation);
 
     return {
       translatedText: finalTranslation,
       detectedLanguage: parsed.detected_source_language || parsed.language || "Não identificado",
-      notes: Array.isArray(parsed.translator_notes) ? parsed.translator_notes : 
-             Array.isArray(parsed.notes) ? parsed.notes : [],
+      notes: normalizeNotes(
+        Array.isArray(parsed.translator_notes)
+          ? parsed.translator_notes
+          : Array.isArray(parsed.notes)
+            ? parsed.notes
+            : [],
+        settings
+      ),
       adaptedExpressions: Array.isArray(parsed.adapted_expressions) ? parsed.adapted_expressions : [],
       toneDetected: parsed.tone_detected || "",
       translationStrategy: parsed.translation_strategy || ""
     };
   } catch (error) {
     console.error("Erro ao interpretar resposta:", error, rawResponse);
-    
-    // Fallback agressivo: se não for JSON mas houver texto substancial, usa o texto bruto
-    // Removemos possíveis marcas de JSON se o parser falhou
+
     const fallbackText = rawResponse
       .replace(/```json/g, "")
       .replace(/```/g, "")
-      .replace(/\{"translation":/g, "")
-      .replace(/"detected_source_language":.*?,/g, "")
-      .replace(/"translator_notes":.*?\]/g, "")
-      .replace(/"adapted_expressions":.*?\]/g, "")
-      .replace(/"tone_detected":.*?,/g, "")
-      .replace(/"translation_strategy":.*?,/g, "")
+      .replace(/\{\"translation\":/g, "")
+      .replace(/\"detected_source_language\":.*?,/g, "")
+      .replace(/\"translator_notes\":.*?\]/g, "")
+      .replace(/\"adapted_expressions\":.*?\]/g, "")
+      .replace(/\"tone_detected\":.*?,/g, "")
+      .replace(/\"translation_strategy\":.*?,/g, "")
       .replace(/\}/g, "")
       .trim();
 
     if (fallbackText.length > 20) {
       return {
-        translatedText: fallbackText,
+        translatedText: normalizeTranslationText(fallbackText),
         detectedLanguage: "Não identificado",
-        notes: ["Nota: A resposta do modelo não estava em formato JSON perfeito, mas o texto foi recuperado."],
+        notes: settings?.showNotes ? ["Nota: A resposta do modelo não veio em JSON perfeito, mas o texto foi recuperado."] : [],
         adaptedExpressions: [],
         toneDetected: "Desconhecido",
         translationStrategy: "Recuperação de emergência"
       };
     }
-    
+
     throw new Error("Recebemos uma resposta malformada do modelo que não pôde ser recuperada.");
   }
 }
@@ -246,6 +301,7 @@ export async function translateTextFallback(
   const prompt = `Traduza o seguinte texto literário de ${settings.sourceLanguage} para ${settings.targetLanguage}.
 Mantenha o tom ${settings.tone} e o modo ${settings.mode}.
 PRESERVE A FORMATAÇÃO ORIGINAL (parágrafos e quebras de linha).
+NÃO use expressões artificiais como "suco de cadáver", "caldo de cadáver" ou "rosto por fazer".
 
 TEXTO:
 """
@@ -263,7 +319,7 @@ Retorne APENAS o JSON:
 }`;
 
   const rawResponse = await callTranslationModel(prompt, 1);
-  return parseTranslationResponse(rawResponse);
+  return parseTranslationResponse(rawResponse, settings);
 }
 
 /**
@@ -275,33 +331,29 @@ export async function translateText(
   onProgress?: (message: string) => void,
   forceStructure: boolean = false
 ): Promise<TranslationResult> {
-  // 1. Validar entrada
   const validationError = validateTranslationInput(text);
   if (validationError) {
     throw new Error(validationError);
   }
 
-  // 2. Montar prompt
   let prompt = buildTranslationPrompt(text, settings);
-  
+
   if (forceStructure) {
     prompt += "\n\nAVISO DE REVISÃO ESTRUTURAL: O bloco anterior foi rejeitado por fusão de parágrafos. NESTE BLOCO, é MANDATÁRIO manter exatamente a mesma quantidade de quebras de linha e parágrafos do original. NÃO UNA LINHAS INDEPENDENTES.";
   }
 
-  // 3. Chamar modelo (com mensagens de progresso)
   onProgress?.("Analisando sentido, tom e intenção...");
   await new Promise(r => setTimeout(r, 800));
-  
+
   onProgress?.("Interpretando atmosfera e nuances culturais...");
   const rawResponse = await callTranslationModel(prompt);
-  
+
   onProgress?.("Refinando voz narrativa e naturalidade...");
   await new Promise(r => setTimeout(r, 600));
-  
+
   onProgress?.("Finalizando tradução literária...");
-  
-  // 4. Interpretar resposta
-  return parseTranslationResponse(rawResponse);
+
+  return parseTranslationResponse(rawResponse, settings);
 }
 
 export interface ChatMessage {
@@ -381,7 +433,7 @@ export async function callChatModel(prompt: string): Promise<string> {
   }
 
   const ai = new GoogleGenAI({ apiKey: API_KEY });
-  
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
@@ -408,7 +460,7 @@ export async function performOcrOnImage(base64Image: string, mimeType: string = 
   }
 
   const ai = new GoogleGenAI({ apiKey: API_KEY });
-  
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
