@@ -60,11 +60,55 @@ function normalizeTranslationText(text: string): string {
   }
 
   normalized = normalized
-    .replace(/([.!?…])([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÖÚÇ—])/g, "$1\n$2")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
   return normalized;
+}
+
+function extractFirstJSONObject(raw: string): string {
+  const start = raw.indexOf("{");
+  if (start === -1) {
+    return raw.trim();
+  }
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < raw.length; i++) {
+    const char = raw[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === "{") {
+      depth += 1;
+      continue;
+    }
+
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return raw.slice(start, i + 1).trim();
+      }
+    }
+  }
+
+  return raw.slice(start).trim();
 }
 
 /**
@@ -232,9 +276,7 @@ export function parseTranslationResponse(
 ): TranslationResult {
   try {
     const cleanResponse = rawResponse.trim();
-    const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
-    const jsonString = jsonMatch ? jsonMatch[0] : cleanResponse;
-
+    const jsonString = extractFirstJSONObject(cleanResponse);
     const parsed = JSON.parse(jsonString);
     const translation = parsed.translation || parsed.translatedText || parsed.text;
 
