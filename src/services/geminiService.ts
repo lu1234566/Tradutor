@@ -25,10 +25,18 @@ const LEXICAL_GUARDRAILS = [
   { pattern: /\bsuco de cadáver\b/gi, replacement: "fluidos de cadáver" },
   { pattern: /\bcaldo de cadáver\b/gi, replacement: "fluidos de cadáver" },
   { pattern: /\brosto por fazer\b/gi, replacement: "rosto mal barbeado" },
-  { pattern: /\bexpressão no rosto mal barbeado completamente vazia\b/gi, replacement: "expressão completamente vazia no rosto mal barbeado" },
+  { pattern: /\bexpressão no rosto mal barbeado completamente vazia\b/gi, replacement: "a expressão em seu rosto mal barbeado é completamente vazia" },
+  { pattern: /\bexpressão no rosto barbado completamente vazia\b/gi, replacement: "a expressão em seu rosto mal barbeado é completamente vazia" },
+  { pattern: /\ba expressão em seu rosto com a barba por fazer é completamente vazia\b/gi, replacement: "a expressão em seu rosto mal barbeado é completamente vazia" },
   { pattern: /\bfico em choque\b/gi, replacement: "fico impressionada" },
-  { pattern: /^É divino\.$/gim, replacement: "É perfeito." },
+  { pattern: /\bfico chocada\b/gi, replacement: "fico impressionada" },
+  { pattern: /^É divino\.$/gim, replacement: "É um paraíso." },
+  { pattern: /^É perfeito\.$/gim, replacement: "É um paraíso." },
+  { pattern: /^É o paraíso\.$/gim, replacement: "É um paraíso." },
   { pattern: /\buma gota salgada escorre\b/gi, replacement: "uma gota de suor escorre" },
+  { pattern: /\bnecropsia\b/gi, replacement: "dissecação" },
+  { pattern: /\bum boxeador\b/gi, replacement: "uma boxeadora" },
+  { pattern: /\buma loba solitária\b/gi, replacement: "uma pessoa solitária" },
 ];
 
 function normalizeNotes(
@@ -171,8 +179,8 @@ ORDEM DE PRIORIDADE (Siga rigorosamente):
 REGRAS DE OURO:
 - EVITE O CÔMICO INVOLUNTÁRIO: nunca use soluções como "suco de cadáver" ou "caldo de cadáver" em narrativa séria; prefira "fluidos de cadáver" ou outra opção natural.
 - DESCRIÇÕES NATURAIS: use expressões idiomáticas brasileiras em descrições físicas. Prefira "rosto mal barbeado" ou "barba por fazer" a "rosto por fazer".
-- NUANCE EXATA: diferencie espanto de horror. Para "I’m always in awe", prefira soluções como "fico impressionada" ou "fico pasma", não "fico em choque", salvo se o contexto realmente exigir choque.
-- REGISTRO NATURAL: se a voz interna estiver íntima e direta, prefira "É perfeito." ou "É um alívio." a soluções excessivamente elevadas como "É divino.", a menos que o próprio original peça solenidade.
+- NUANCE EXATA: diferencie espanto de horror. Para "I’m always in awe", prefira soluções como "fico impressionada" ou "fico pasma", não "fico em choque" ou "fico chocada", salvo se o contexto realmente exigir choque.
+- REGISTRO NATURAL: se a voz interna estiver íntima e direta, prefira "É um paraíso." ou "É um alívio." a soluções excessivamente elevadas como "É divino.", a menos que o próprio original peça solenidade.
 - AMBIGUIDADE CONTROLADA: quando o original for ambíguo, preserve a ambiguidade sem criar expressões estranhas. Exemplo: evite "uma gota salgada"; prefira uma solução clara e natural se o contexto permitir.
 - DIÁLOGOS VIVOS: diálogos devem soar como fala real, com oralidade natural e espontaneidade.
 - SEM SOLENIDADE EXCESSIVA: a narradora é humana e tensa, não empolada. Evite elevação desnecessária.
@@ -180,7 +188,7 @@ REGRAS DE OURO:
 EXEMPLOS DE BOAS ESCOLHAS:
 - "cadaver juice" -> "fluidos de cadáver"
 - "the expression on his unshaven face" -> "a expressão em seu rosto mal barbeado"
-- "It’s heavenly." -> "É perfeito." / "É um alívio." (conforme a voz)
+- "It’s heavenly." -> "É um paraíso." / "É um alívio." (conforme a voz)
 - "I’m always in awe." -> "sempre fico impressionada." / "sempre fico pasma."
 
 REVISÃO EDITORIAL FINAL (FILTRO SILENCIOSO):
